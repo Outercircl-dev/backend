@@ -25,6 +25,9 @@ node_modules/
 packages/**/*.d.ts
 packages/**/*.js
 
+# distribution
+dist/
+
 # misc
 .DS_Store
 lerna-debug.log

@@ -28,4 +28,9 @@ export class AppController {
     return req.user
   }
 
+  @Get('health')
+  health(@Req() req: Request) {
+    return true
+  }
+
 }
