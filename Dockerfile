@@ -4,12 +4,11 @@ FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable
 
-# Install dependencies (dev deps included for build)
-COPY package*.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
-
-# Copy source and build the NestJS project
+# Generate lockfile and install dependencies for the build
+COPY package*.json ./
+RUN pnpm install --lockfile-only
 COPY . .
+RUN pnpm install --frozen-lockfile
 RUN pnpm run build
 
 # ---- Runtime image ----
@@ -19,11 +18,12 @@ RUN corepack enable
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Install only production deps
-COPY package*.json pnpm-lock.yaml ./
+# Reuse lockfile from build stage and install only production deps
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/pnpm-lock.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 
-# Copy compiled artifacts from the build stage
+# Copy compiled artifacts from the build stagen
 COPY --from=build /app/dist ./dist
 
 EXPOSE 4000
