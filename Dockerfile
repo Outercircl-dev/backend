@@ -5,8 +5,11 @@ WORKDIR /app
 RUN corepack enable
 
 # Install dependencies (dev deps included for build)
-COPY package*.json pnpm-lock.yaml ./
+COPY package*.json ./
+RUN pnpm install --lockfile-only
+COPY . .
 RUN pnpm install --frozen-lockfile
+RUN pnpm run build
 
 # Copy source and build the NestJS project
 COPY . .
