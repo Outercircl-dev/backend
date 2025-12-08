@@ -3,6 +3,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN corepack enable
+ENV CI=true
 
 # Install dependencies (dev deps included for build)
 COPY package*.json ./
@@ -19,6 +20,7 @@ RUN pnpm run build
 FROM node:20-alpine AS production
 WORKDIR /app
 RUN corepack enable
+ENV CI=true
 ENV NODE_ENV=production
 ENV PORT=4000
 
