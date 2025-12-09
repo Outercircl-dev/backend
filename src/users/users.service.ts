@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { SupabaseJwtPayload } from '../auth/supabase-jwt.strategy'
+import { User } from './user.entity'
 
 @Injectable()
 export class UsersService {

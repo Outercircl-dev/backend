@@ -1,8 +1,7 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
-import { ExtractJwt, Strategy } from "passport-jwt";
-import { jwtConstants } from "./constants";
-import { UsersService } from "src/users/users.service";
+import { verifySupabaseJwt } from "./supabase-jwks";
+import { Strategy } from "passport-custom";
 
 export interface SupabaseJwtPayload {
     sub: string
@@ -13,35 +12,35 @@ export interface SupabaseJwtPayload {
 
 @Injectable()
 export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jwt') {
-    constructor(private readonly usersService: UsersService) {
-        if (!process.env.SUPABASE_JWT_SECRET) {
-            throw new Error('SUPABASE_JWT_SECRET is not set')
-        }
-        super({
-            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-            ignoreExpiration: false,
-            secretOrKey: process.env.SUPABASE_SECRET_KEY || jwtConstants.secret,
-            algorithms: ['HS256']
-        })
-    }
+    private readonly logger = new Logger(SupabaseJwtStrategy.name, { timestamp: true });
 
-    async validate(payload: SupabaseJwtPayload) {
-        if (payload.role && payload.role !== 'authenticated') {
-            throw new UnauthorizedException('Invalid Supabase Role')
-        }
-        // Fetch user data from DB
-        const user = await this.usersService.findOrCreateFromSupabasePayload(payload);
-        // If fetching failed raise Unauthorized Exception
-        if (!user) {
-            throw new UnauthorizedException('User not found or could not be created');
+    async validate(req: Request): Promise<any> {
+        this.logger.debug('Initiating JWT Validation using Supabase JWKS Strategy');
+        const authHeader = (req.headers as any).authorization;
+
+        if (!authHeader?.startsWith("Bearer ")) {
+            throw new UnauthorizedException("Missing or invalid Authorization header");
         }
 
-        return {
-            id: user.id,
-            supabaseUserId: user.supabaseId,
-            email: user.email,
-            hasOnboarded: user.hasOnboarded,
-            role: user.role,
+        const token = authHeader.split(" ")[1];
+
+        try {
+            const payload = await verifySupabaseJwt(token);
+            this.logger.debug(`JWT Token verification completed. Payload = ${payload}`);
+
+            if (!payload.sub) {
+                throw new UnauthorizedException("Missing sub in JWT");
+            }
+
+            return {
+                supabaseUserId: payload.sub,
+                email: payload.email,
+                role: payload.role,
+                raw: payload,
+            };
+        } catch (err) {
+            console.error("JWT verification error:", err);
+            throw new UnauthorizedException("Invalid Supabase token");
         }
     }
 }
