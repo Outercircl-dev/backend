@@ -10,14 +10,15 @@ export class AuthService {
     ) { }
 
     //  use bcrypt, with a salted one-way hash algorithm to handle passwords
-    async validateUser(userName: string, pass: string): Promise<any> {
-        const user = await this.usersService.findOne(userName);
-        if (user && user.password == pass) {
-            const { password, ...result } = user;
-            return result;
-        }
-        return null;
-    }
+    // TODO: Validate the user using Supabase Payload
+    // async validateUser(userName: string, pass: string): Promise<any> {
+    //     const user = await this.usersService.findOne(userName);
+    //     if (user && user.password == pass) {
+    //         const { password, ...result } = user;
+    //         return result;
+    //     }
+    //     return null;
+    // }
     async login(user: any) {
         const payload = { userName: user.userName, sub: user.userId };
         return {
