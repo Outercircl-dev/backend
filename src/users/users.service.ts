@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { SupabaseJwtPayload } from '../auth/supabase-jwt.strategy'
 import { User } from './user.entity'
+import { SubscriptionTier } from 'src/common/enums/subscription-tier.enum'
 
 @Injectable()
 export class UsersService {
@@ -18,7 +19,8 @@ export class UsersService {
             supabaseId: payload.sub,
             email: payload.email ?? '',
             hasOnboarded: false,
-            role: 'user',
+            role: payload.role ?? 'not-authenticated',
+            type: SubscriptionTier.FREEMIUM,
         }
 
         this.users.push(user)
@@ -45,6 +47,45 @@ export class UsersService {
             throw new Error('User not found')
         }
         user.hasOnboarded = true
+        return user
+    }
+
+    async upsertHasOnboardedStatus(
+        supabaseId: string,
+        hasOnboarded: boolean,
+        email?: string,
+        role?: string,
+        type?: SubscriptionTier,
+    ): Promise<User> {
+        let user = await this.findBySupabaseId(supabaseId)
+
+        if (!user) {
+            user = {
+                id: randomUUID(),
+                supabaseId,
+                email: email ?? '',
+                hasOnboarded,
+                role: role ?? 'not-authenticated',
+                type: type ?? SubscriptionTier.FREEMIUM,
+            }
+            this.users.push(user)
+            return user
+        }
+
+        user.hasOnboarded = hasOnboarded
+        if (email && user.email !== email) {
+            user.email = email
+        }
+        if (role && user.role !== role) {
+            user.role = role
+        }
+        if (type && user.type !== type) {
+            user.type = type
+        }
+        if (!user.type) {
+            user.type = SubscriptionTier.FREEMIUM
+        }
+
         return user
     }
 }
