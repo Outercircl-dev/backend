@@ -10,6 +10,7 @@ import { MeModule } from './me/me.module';
 import { InterestsModule } from './v1/catalog/interests/interests.module';
 import { PrismaModule } from './prisma/prisma.module';
 import configuration from './config/configuration';
+import { validate } from './config/validation';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import configuration from './config/configuration';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
-      load: [configuration]
+      load: [configuration],
+      validate: validate
     }),
     MeModule,
     InterestsModule,
