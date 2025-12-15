@@ -54,3 +54,7 @@ build/config\.gypi
 
 .npmrc
 /.history
+
+/generated/prisma
+
+.env

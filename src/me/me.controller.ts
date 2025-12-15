@@ -2,16 +2,7 @@ import { BadRequestException, Body, Controller, Get, Logger, Put, Req, UseGuards
 import { SupabaseAuthGuard } from "src/auth/supabase-auth.guard";
 import { SubscriptionTier } from "src/common/enums/subscription-tier.enum";
 import { UsersService } from "src/users/users.service";
-import { Request } from "express";
-
-interface AuthenticatedUser {
-    id?: string
-    supabaseUserId?: string
-    email?: string
-    hasOnboarded?: boolean
-    role?: string
-    type?: SubscriptionTier
-}
+import type { AuthenticatedRequest } from "src/common/interfaces/authenticated-request.interface";
 
 interface BackendMeResponse {
     id: string
@@ -24,10 +15,6 @@ interface BackendMeResponse {
 
 interface UpdateMeRequest {
     hasOnboarded: boolean
-}
-
-interface AuthenticatedRequest extends Request {
-    user: AuthenticatedUser
 }
 
 @Controller('me')

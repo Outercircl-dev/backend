@@ -7,9 +7,24 @@ import { FeedModule } from './feed/feed.module';
 import { MeController } from './me/me.controller';
 import { ConfigModule } from '@nestjs/config';
 import { MeModule } from './me/me.module';
+import { InterestsModule } from './v1/catalog/interests/interests.module';
+import { PrismaModule } from './prisma/prisma.module';
+import configuration from './config/configuration';
 
 @Module({
-  imports: [AuthModule, UsersModule, FeedModule, ConfigModule.forRoot(), MeModule],
+  imports: [
+    AuthModule,
+    UsersModule,
+    FeedModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+      load: [configuration]
+    }),
+    MeModule,
+    InterestsModule,
+    PrismaModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
