@@ -6,7 +6,7 @@ export function validate(config: Record<string, unknown>) {
         PORT: Joi.number().default(3000),
 
         DATABASE_URL: Joi.string().uri().required(),
-        DIRECT_URL: Joi.string().uri().required(),
+        DIRECT_URL: Joi.string().uri().optional(),
 
         JWT_SECRET: Joi.string().min(32).required(),
         JWT_EXPIRES_IN: Joi.string().optional(),

@@ -1,15 +1,35 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InterestsController } from './interests.controller';
+import { InterestsService } from './interests.service';
+
+jest.mock('src/generated/prisma/client', () => {
+  class PrismaClient {
+    interest = { findMany: jest.fn() };
+    $disconnect = jest.fn();
+    $connect = jest.fn();
+  }
+  return { PrismaClient };
+}, { virtual: true });
 
 describe('InterestsController', () => {
   let controller: InterestsController;
+  let service: InterestsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [InterestsController],
+      providers: [
+        {
+          provide: InterestsService,
+          useValue: {
+            // mock methods here as needed
+          },
+        },
+      ],
     }).compile();
 
-    controller = module.get<InterestsController>(InterestsController);
+    service = module.get<InterestsService>(InterestsService);
+    controller = new InterestsController(service);
   });
 
   it('should be defined', () => {
