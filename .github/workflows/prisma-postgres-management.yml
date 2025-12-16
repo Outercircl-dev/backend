@@ -1,0 +1,63 @@
+name: Prisma Local Postgres
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+
+env:
+  DATABASE_URL: postgresql://prisma:prisma@localhost:5432/app
+
+jobs:
+  prisma-local:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U prisma"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Postgres client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres
+        env:
+          PGPASSWORD: prisma
+        run: |
+          until pg_isready -h localhost -p 5432 -U prisma; do
+            echo "Waiting for Postgres..."
+            sleep 2
+          done
+
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
+
+      - name: Push schema
+        run: pnpm prisma db push
+
+      - name: Seed database
+        run: pnpm seed
