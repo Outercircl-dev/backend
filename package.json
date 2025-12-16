@@ -74,6 +74,7 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "moduleNameMapper": {
+      "^src/generated/prisma/(.*)$": "<rootDir>/__mocks__/generated/prisma/$1",
       "^src/(.*)$": "<rootDir>/$1"
     },
     "transform": {
