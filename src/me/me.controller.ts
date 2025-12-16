@@ -30,13 +30,11 @@ interface UpdateMeRequest {
 export class MeController {
   private readonly logger = new Logger(MeController.name, { timestamp: true });
 
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @UseGuards(SupabaseAuthGuard)
   @Get()
   async me(@Req() req: AuthenticatedRequest): Promise<BackendMeResponse> {
-    this.logger.log('Getting Profile information');
-    this.logger.debug(`Request = ${JSON.stringify(req.user)}`);
     const user = req.user ?? {};
 
     if (!user.role || !user.supabaseUserId || !user.email) {
