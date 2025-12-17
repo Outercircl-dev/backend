@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS build
+FROM node:24.12.0-slim AS build
 WORKDIR /app
 RUN corepack enable
 ENV CI=true
@@ -17,7 +17,7 @@ COPY . .
 RUN pnpm run build
 
 # ---- Runtime image ----
-FROM node:20-alpine AS production
+FROM node:24.12.0-slim AS production
 WORKDIR /app
 RUN corepack enable
 ENV CI=true

@@ -31,6 +31,13 @@
 $ pnpm install
 ```
 
+## Configuration / Environment Variables
+
+- Required: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `SUPABASE_PROJECT_REF`, `SUPABASE_SECRET_KEY`.
+- Optional (defaults if unset): `NODE_ENV` (`production`), `JWT_EXPIRES_IN` (`15m`), `PORT` (`3000` locally).
+- Example file: copy `.env.example` to `.env` and fill the required secrets.
+- Docker image note: the `Dockerfile` sets `NODE_ENV=production` and `PORT=4000` (container listens on 4000). Supply the required variables at runtime (e.g., `docker run -e DATABASE_URL=... -e JWT_SECRET=...` or inject via your orchestrator’s env/secrets mechanism).
+
 ## Compile and run the project
 
 ```bash
