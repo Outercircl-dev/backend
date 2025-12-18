@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.6
 
 FROM node:24.12.0-slim AS build
 WORKDIR /app
@@ -10,7 +10,9 @@ COPY package*.json ./
 RUN pnpm install --lockfile-only
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm prisma generate
+RUN --mount=type=secret,id=DATABASE_URL \
+    export DATABASE_URL="$(cat /run/secrets/DATABASE_URL)" && \
+    pnpm prisma generate
 RUN pnpm run build
 
 # Copy source and build the NestJS project
