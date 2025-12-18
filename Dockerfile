@@ -17,7 +17,6 @@ RUN pnpm run build
 
 # Copy source and build the NestJS project
 COPY . .
-RUN npx prisma generate
 RUN pnpm run build
 
 # ---- Runtime image ----
