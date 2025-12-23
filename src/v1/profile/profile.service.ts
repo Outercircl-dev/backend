@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "src/prisma/prisma.service";
 
 export interface ProfileInput {
@@ -48,12 +48,13 @@ export class ProfileService {
             acceptedTos,
             acceptedGuidelines,
         } = input;
+        const parsedDob = this.parseDateOrThrow(dateOfBirth);
 
         return this.prisma.user_profiles.upsert({
             where: { user_id: supabaseUserId },
             update: {
                 full_name: fullName,
-                date_of_birth: new Date(dateOfBirth),
+                date_of_birth: parsedDob,
                 gender,
                 profile_picture_url: profilePictureUrl,
                 interests,
@@ -67,7 +68,7 @@ export class ProfileService {
             create: {
                 user_id: supabaseUserId,
                 full_name: fullName,
-                date_of_birth: new Date(dateOfBirth),
+                date_of_birth: parsedDob,
                 gender,
                 profile_picture_url: profilePictureUrl,
                 interests,
@@ -109,6 +110,22 @@ export class ProfileService {
         return this.prisma.user_profiles.delete({
             where: { user_id: userId },
         });
+    }
+
+    private parseDateOrThrow(dateString: string): Date {
+        const trimmed = dateString?.trim();
+        const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+        if (!trimmed || !isoDateRegex.test(trimmed)) {
+            throw new BadRequestException('dateOfBirth must be in YYYY-MM-DD format');
+        }
+
+        const parsed = new Date(trimmed);
+        if (Number.isNaN(parsed.getTime())) {
+            throw new BadRequestException('dateOfBirth must be in YYYY-MM-DD format');
+        }
+
+        return parsed;
     }
 }
 

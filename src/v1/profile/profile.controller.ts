@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Logger, NotFoundException, Patch, Post, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, HttpException, HttpStatus, Logger, Patch, Post, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { ProfileService, type ProfileInput, type ProfileUpdateInput } from "./profile.service";
 import type { AuthenticatedRequest } from "src/common/interfaces/authenticated-request.interface";
 import { SupabaseAuthGuard } from "src/auth/supabase-auth.guard";
@@ -22,7 +22,7 @@ export class ProfileController {
 
         const profile = await this.profiles.getProfile(supabaseUserId);
         if (!profile) {
-            throw new NotFoundException(
+            throw new HttpException(
                 this.buildErrorResponse(
                     req?.url ?? '/profile',
                     'Profile not found',
@@ -32,6 +32,7 @@ export class ProfileController {
                         message: 'No profile found for this user',
                     }],
                 ),
+                HttpStatus.NOT_FOUND,
             );
         }
 
@@ -59,12 +60,31 @@ export class ProfileController {
                 message: 'Full name is required',
             });
         }
-        if (!body.dateOfBirth?.trim()) {
+        const dobTrimmed = body.dateOfBirth?.trim();
+        if (!dobTrimmed) {
             errors.push({
                 field: 'dateOfBirth',
                 code: 'required',
                 message: 'Date of birth is required',
             });
+        } else {
+            const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!isoDateRegex.test(dobTrimmed)) {
+                errors.push({
+                    field: 'dateOfBirth',
+                    code: 'invalid_format',
+                    message: 'Date of birth must be in YYYY-MM-DD format',
+                });
+            } else {
+                const parsed = new Date(dobTrimmed);
+                if (Number.isNaN(parsed.getTime())) {
+                    errors.push({
+                        field: 'dateOfBirth',
+                        code: 'invalid_format',
+                        message: 'Date of birth must be in YYYY-MM-DD format',
+                    });
+                }
+            }
         }
         if (!body.gender?.trim()) {
             errors.push({
