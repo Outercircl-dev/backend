@@ -22,6 +22,37 @@ model Interest {
   @@schema("public")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model user_profiles {
+  id                     String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                String      @unique @db.Uuid
+  full_name              String      @db.VarChar(100)
+  date_of_birth          DateTime    @db.Date
+  gender                 gender_type
+  profile_picture_url    String?     @db.VarChar(512)
+  bio                    String?
+  interests              Json        @default("[]")
+  hobbies                String[]    @default([])
+  availability           Json?       @default("{}")
+  distance_radius_km     Int?        @default(25)
+  accepted_tos           Boolean     @default(false)
+  accepted_guidelines    Boolean     @default(false)
+  accepted_tos_at        DateTime?   @db.Timestamptz(6)
+  accepted_guidelines_at DateTime?   @db.Timestamptz(6)
+  profile_completed      Boolean?    @default(false)
+  is_verified            Boolean?    @default(false)
+  created_at             DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?   @default(now()) @db.Timestamptz(6)
+  confirmed_age          Boolean     @default(false)
+  confirmed_platonic     Boolean     @default(false)
+
+  @@index([created_at(sort: Desc)], map: "idx_user_profiles_created_at")
+  @@index([interests], map: "idx_user_profiles_interests", type: Gin)
+  @@index([user_id], map: "idx_user_profiles_user_id")
+  @@schema("public")
+}
+
 /// We could not retrieve columns for the underlying table. Either it has none or you are missing rights to see them. Please check your privileges.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -166,35 +197,6 @@ model Interest {
 // model users {
 // @@schema("auth")
 // }
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model user_profiles {
-  id                     String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id                String      @unique @db.Uuid
-  full_name              String      @db.VarChar(100)
-  date_of_birth          DateTime    @db.Date
-  gender                 gender_type
-  profile_picture_url    String?     @db.VarChar(512)
-  bio                    String?
-  interests              Json        @default("[]")
-  hobbies                String[]    @default([])
-  availability           Json?       @default("{}")
-  distance_radius_km     Int?        @default(25)
-  accepted_tos           Boolean     @default(false)
-  accepted_guidelines    Boolean     @default(false)
-  accepted_tos_at        DateTime?   @db.Timestamptz(6)
-  accepted_guidelines_at DateTime?   @db.Timestamptz(6)
-  profile_completed      Boolean?    @default(false)
-  is_verified            Boolean?    @default(false)
-  created_at             DateTime?   @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime?   @default(now()) @db.Timestamptz(6)
-
-  @@index([created_at(sort: Desc)], map: "idx_user_profiles_created_at")
-  @@index([interests], map: "idx_user_profiles_interests", type: Gin)
-  @@index([user_id], map: "idx_user_profiles_user_id")
-  @@schema("public")
-}
 
 enum aal_level {
   aal1
