@@ -10,7 +10,6 @@ export class InterestsController {
   @UseGuards(SupabaseAuthGuard)
   @Get()
   async list(@Req() req: AuthenticatedRequest) {
-    // Placeholder response; replace with actual interests once service exists
     return { categories: await this.interests.getInterestsCatalog() };
   }
 }

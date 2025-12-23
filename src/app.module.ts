@@ -11,6 +11,7 @@ import { InterestsModule } from './v1/catalog/interests/interests.module';
 import { PrismaModule } from './prisma/prisma.module';
 import configuration from './config/configuration';
 import { validate } from './config/validation';
+import { ProfileModule } from './v1/profile/profile.module';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { validate } from './config/validation';
     }),
     MeModule,
     InterestsModule,
-    PrismaModule
+    PrismaModule,
+    ProfileModule
   ],
   controllers: [AppController],
   providers: [AppService],
