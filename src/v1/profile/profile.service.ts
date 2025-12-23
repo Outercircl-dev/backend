@@ -47,6 +47,8 @@ export class ProfileService {
             availability,
             acceptedTos,
             acceptedGuidelines,
+            confirmedAge,
+            confirmedPlatonic,
         } = input;
         const parsedDob = this.parseDateOrThrow(dateOfBirth);
 
@@ -64,7 +66,9 @@ export class ProfileService {
                 distance_radius_km: distanceRadiusKm ?? 25,
                 accepted_tos: acceptedTos,
                 accepted_guidelines: acceptedGuidelines,
-            },
+                confirmed_age: confirmedAge,
+                confirmed_platonic: confirmedPlatonic,
+            } as any,
             create: {
                 user_id: supabaseUserId,
                 full_name: fullName,
@@ -78,7 +82,9 @@ export class ProfileService {
                 distance_radius_km: distanceRadiusKm ?? 25,
                 accepted_tos: acceptedTos,
                 accepted_guidelines: acceptedGuidelines,
-            },
+                confirmed_age: confirmedAge,
+                confirmed_platonic: confirmedPlatonic,
+            } as any,
         });
     }
 
