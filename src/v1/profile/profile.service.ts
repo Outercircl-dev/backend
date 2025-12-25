@@ -68,6 +68,7 @@ export class ProfileService {
                 accepted_guidelines: acceptedGuidelines,
                 confirmed_age: confirmedAge,
                 confirmed_platonic: confirmedPlatonic,
+                profile_completed: true, // Mark profile as completed when saving via POST
             } as any,
             create: {
                 user_id: supabaseUserId,
@@ -84,6 +85,7 @@ export class ProfileService {
                 accepted_guidelines: acceptedGuidelines,
                 confirmed_age: confirmedAge,
                 confirmed_platonic: confirmedPlatonic,
+                profile_completed: true, // Mark profile as completed when creating via POST
             } as any,
         });
     }
