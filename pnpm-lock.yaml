@@ -87,9 +87,15 @@ importers:
       '@types/passport-local':
         specifier: ^1.0.38
         version: 1.0.38
+      '@types/pg':
+        specifier: ^8.16.0
+        version: 8.16.0
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
       eslint:
         specifier: ^9.18.0
         version: 9.39.2(jiti@2.6.1)
@@ -105,6 +111,9 @@ importers:
       jest:
         specifier: ^30.0.0
         version: 30.2.0(@types/node@22.19.3)(ts-node@10.9.2(@types/node@22.19.3)(typescript@5.9.3))
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
       prettier:
         specifier: ^3.4.2
         version: 3.7.4
@@ -1172,6 +1181,9 @@ packages:
   '@types/passport@1.0.17':
     resolution: {integrity: sha512-aciLyx+wDwT2t2/kJGJR2AEeBz0nJU4WuRX04Wu9Dqc5lSUtwu0WERPHYsLhF9PtseiAMPBGNUOtFjxZ56prsg==}
 
+  '@types/pg@8.16.0':
+    resolution: {integrity: sha512-RmhMd/wD+CF8Dfo+cVIy3RR5cl8CyfXQ0tGgW6XBL8L4LM/UTEbNXYRbLwU6w+CgrKBNbrQWt4FUtTfaU5jSYQ==}
+
   '@types/qs@6.14.0':
     resolution: {integrity: sha512-eOunJqu0K1923aExK6y8p6fsihYEn/BYuQ4g0CxAAgFc4b/ZLN4CrsRZ55srTdqoiLzU2B2evC+apEIxprEzkQ==}
 
@@ -1859,6 +1871,10 @@ packages:
 
   dotenv@16.6.1:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
+    engines: {node: '>=12'}
+
+  dotenv@17.2.3:
+    resolution: {integrity: sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w==}
     engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
@@ -4848,6 +4864,12 @@ snapshots:
     dependencies:
       '@types/express': 5.0.6
 
+  '@types/pg@8.16.0':
+    dependencies:
+      '@types/node': 22.19.3
+      pg-protocol: 1.10.3
+      pg-types: 2.2.0
+
   '@types/qs@6.14.0': {}
 
   '@types/range-parser@1.2.7': {}
@@ -5533,11 +5555,13 @@ snapshots:
 
   dotenv-expand@12.0.1:
     dependencies:
-      dotenv: 16.4.7
+      dotenv: 16.6.1
 
   dotenv@16.4.7: {}
 
   dotenv@16.6.1: {}
+
+  dotenv@17.2.3: {}
 
   dunder-proto@1.0.1:
     dependencies:
