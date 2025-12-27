@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS public.activities (
   category VARCHAR(50),
   
   -- Interest Matching (for Interest Score calculation)
+  -- Note: Interest slugs are validated at the application/service layer before insert/update
+  -- to ensure they exist in the public.interests table. This validation cannot be enforced
+  -- via foreign key constraints since interests is a JSONB array.
   interests JSONB NOT NULL DEFAULT '[]'::jsonb, -- Array of interest slugs/IDs
   
   -- Location (for Proximity Score calculation)
@@ -53,7 +56,9 @@ CREATE TABLE IF NOT EXISTS public.activities (
     jsonb_array_length(interests) > 0
   ),
   CONSTRAINT location_has_coordinates CHECK (
-    location ? 'latitude' AND location ? 'longitude'
+    location ? 'latitude' AND location ? 'longitude' AND
+    (location->>'latitude')::numeric BETWEEN -90 AND 90 AND
+    (location->>'longitude')::numeric BETWEEN -180 AND 180
   )
 );
 
@@ -71,6 +76,10 @@ CREATE INDEX idx_activities_location_gin ON public.activities USING GIN (locatio
 -- Composite index for common queries (status + date for feed)
 CREATE INDEX idx_activities_status_date ON public.activities(status, activity_date DESC) 
   WHERE status = 'published';
+
+-- Additional indexes for common query patterns
+CREATE INDEX idx_activities_is_public ON public.activities(is_public) WHERE is_public = true;
+CREATE INDEX idx_activities_host_status ON public.activities(host_id, status);
 
 -- Trigger for auto-updating updated_at
 CREATE OR REPLACE FUNCTION update_activities_timestamp()

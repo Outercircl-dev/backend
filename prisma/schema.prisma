@@ -288,6 +288,10 @@ enum activity_status {
 
 model Activity {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Note: host_id references auth.users(id) but lacks @relation annotation
+  // This is intentional as auth.users is Supabase-managed and Prisma cannot enforce
+  // referential integrity across schemas. The foreign key constraint is enforced
+  // at the database level via SQL migration (002_OD_184_activities_table.sql).
   host_id            String          @db.Uuid
   title              String          @db.VarChar(255)
   description        String?
@@ -297,6 +301,15 @@ model Activity {
   activity_date      DateTime        @db.Date
   start_time         DateTime        @db.Time(6)
   end_time           DateTime?       @db.Time(6)
+  // Note: The following CHECK constraints are enforced at the database level
+  // but cannot be represented in Prisma schema:
+  // - max_participants > 0
+  // - current_participants >= 0
+  // - current_participants <= max_participants
+  // - end_time > start_time (when end_time is not null)
+  // - jsonb_array_length(interests) > 0
+  // - location contains valid latitude (-90 to 90) and longitude (-180 to 180)
+  // See migration 002_OD_184_activities_table.sql for full constraint definitions.
   max_participants   Int
   current_participants Int           @default(0)
   status             activity_status @default(draft)
@@ -309,6 +322,8 @@ model Activity {
   @@index([activity_date], map: "idx_activities_activity_date")
   @@index([status], map: "idx_activities_status")
   @@index([category], map: "idx_activities_category")
+  @@index([status, activity_date(sort: Desc)], map: "idx_activities_status_date")
+  @@index([host_id, status], map: "idx_activities_host_status")
   @@index([interests], map: "idx_activities_interests_gin", type: Gin)
   @@index([location], map: "idx_activities_location_gin", type: Gin)
   @@map("activities")
