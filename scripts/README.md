@@ -47,13 +47,14 @@ After running the script, verify the data:
    # Navigate to activities table
    ```
 
-3. **Check via API** (if backend is running):
+3. **Check via API** (requires activities API to be implemented):
    ```bash
+   # Note: These endpoints require the activities feature to be fully deployed
    # Get all activities
-   curl http://localhost:3000/api/activities
+   curl http://localhost:3000/api/v1/activities
    
    # Get paginated (should show 500 total)
-   curl http://localhost:3000/api/activities?page=1&limit=20
+   curl http://localhost:3000/api/v1/activities?page=1&limit=20
    ```
 
 4. **Check data variety**:

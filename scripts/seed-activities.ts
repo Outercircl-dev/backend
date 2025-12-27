@@ -7,9 +7,7 @@
 
 import { PrismaClient } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
-import { randomUUID } from 'crypto';
 
 // Load environment variables
 dotenv.config();
@@ -225,7 +223,12 @@ function addHours(time: string, hours: number): string {
 // Helper function to get random interests (3-8 interests per activity)
 function getRandomInterests(allInterests: string[]): string[] {
   const count = randomInt(3, 8);
-  const shuffled = [...allInterests].sort(() => 0.5 - Math.random());
+  // Fisher-Yates shuffle for uniform distribution
+  const shuffled = [...allInterests];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
   return shuffled.slice(0, count);
 }
 
@@ -293,16 +296,13 @@ async function seedActivities() {
       userIds = profiles.map((p) => p.user_id);
       console.log(`✅ Found ${userIds.length} existing user profiles`);
     } else {
-      // If no profiles exist, we'll need to create test users or use placeholder UUIDs
-      console.log('⚠️  No user profiles found. Using generated test user IDs.');
-      // Generate 10 test user IDs for seeding
-      for (let i = 0; i < 10; i++) {
-        userIds.push(randomUUID());
-      }
-    }
-
-    if (userIds.length === 0) {
-      throw new Error('No user IDs available. Please create at least one user profile first.');
+      // If no profiles exist, we cannot generate random UUIDs as they would violate
+      // foreign key constraints if host_id references auth.users.
+      // Users must create at least one user profile first.
+      throw new Error(
+        'No user profiles found. Please create at least one user profile first. ' +
+        'The seed script requires valid user IDs from the user_profiles table.'
+      );
     }
 
     // Generate 500 activities
@@ -376,11 +376,13 @@ async function seedActivities() {
 
     for (let i = 0; i < activities.length; i += batchSize) {
       const batch = activities.slice(i, i + batchSize);
-      await prisma.activity.createMany({
+      const result = await prisma.activity.createMany({
         data: batch,
         skipDuplicates: true,
       });
-      inserted += batch.length;
+      // Use result.count to get actual number of inserted records
+      // (some may be skipped due to skipDuplicates)
+      inserted += result.count;
       console.log(`  Inserted ${inserted}/500 activities...`);
     }
 

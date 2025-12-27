@@ -288,6 +288,10 @@ enum activity_status {
 
 model Activity {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Note: host_id references auth.users(id) but lacks @relation annotation
+  // This is intentional as auth.users is Supabase-managed and Prisma cannot enforce
+  // referential integrity across schemas. The foreign key constraint is enforced
+  // at the database level via SQL migration.
   host_id            String          @db.Uuid
   title              String          @db.VarChar(255)
   description        String?
@@ -302,7 +306,7 @@ model Activity {
   status             activity_status @default(draft)
   is_public          Boolean         @default(true)
   created_at         DateTime?       @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?       @updatedAt @db.Timestamptz(6)
 
   @@index([host_id], map: "idx_activities_host_id")
   @@index([created_at(sort: Desc)], map: "idx_activities_created_at")
