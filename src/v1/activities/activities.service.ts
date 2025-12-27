@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { ActivityResponseDto } from './dto/activity-response.dto';
+import { Prisma, Activity } from '@prisma/client';
 
 @Injectable()
 export class ActivitiesService {
@@ -39,18 +40,19 @@ export class ActivitiesService {
       throw new BadRequestException('Invalid activity date format');
     }
 
-    // Parse and validate times
-    const startTimeParts = dto.startTime.split(':');
-    if (startTimeParts.length < 2) {
+    // Validate time format using regex (hours 00-23, minutes/seconds 00-59)
+    const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
+    if (!timeFormatRegex.test(dto.startTime)) {
       throw new BadRequestException('Invalid start time format. Use HH:mm or HH:mm:ss');
     }
 
     if (dto.endTime) {
-      const endTimeParts = dto.endTime.split(':');
-      if (endTimeParts.length < 2) {
+      if (!timeFormatRegex.test(dto.endTime)) {
         throw new BadRequestException('Invalid end time format. Use HH:mm or HH:mm:ss');
       }
       // Basic validation: end time should be after start time
+      const startTimeParts = dto.startTime.split(':');
+      const endTimeParts = dto.endTime.split(':');
       const startMinutes = parseInt(startTimeParts[0]) * 60 + parseInt(startTimeParts[1]);
       const endMinutes = parseInt(endTimeParts[0]) * 60 + parseInt(endTimeParts[1]);
       if (endMinutes <= startMinutes) {
@@ -90,7 +92,7 @@ export class ActivitiesService {
     const limit = filters?.limit || 20;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.ActivityWhereInput = {};
     if (filters?.status) {
       where.status = filters.status;
     }
@@ -109,7 +111,7 @@ export class ActivitiesService {
     ]);
 
     return {
-      items: items.map((item) => this.mapToResponseDto(item)),
+      items: items.map((item: Activity) => this.mapToResponseDto(item)),
       total,
       page,
       limit,
@@ -180,25 +182,25 @@ export class ActivitiesService {
     }
 
     // Validate times if provided
+    const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
     let startTime = existing.start_time;
     let endTime = existing.end_time;
     if (dto.startTime) {
-      const startTimeParts = dto.startTime.split(':');
-      if (startTimeParts.length < 2) {
+      if (!timeFormatRegex.test(dto.startTime)) {
         throw new BadRequestException('Invalid start time format. Use HH:mm or HH:mm:ss');
       }
       startTime = dto.startTime;
     }
 
     if (dto.endTime) {
-      const endTimeParts = dto.endTime.split(':');
-      if (endTimeParts.length < 2) {
+      if (!timeFormatRegex.test(dto.endTime)) {
         throw new BadRequestException('Invalid end time format. Use HH:mm or HH:mm:ss');
       }
       endTime = dto.endTime;
 
       // Validate end time is after start time
       const startTimeParts = (dto.startTime || existing.start_time).split(':');
+      const endTimeParts = dto.endTime.split(':');
       const startMinutes = parseInt(startTimeParts[0]) * 60 + parseInt(startTimeParts[1]);
       const endMinutes = parseInt(endTimeParts[0]) * 60 + parseInt(endTimeParts[1]);
       if (endMinutes <= startMinutes) {
@@ -207,7 +209,7 @@ export class ActivitiesService {
     }
 
     // Build update data
-    const updateData: any = {};
+    const updateData: Prisma.ActivityUpdateInput = {};
     if (dto.title !== undefined) updateData.title = dto.title;
     if (dto.description !== undefined) updateData.description = dto.description || null;
     if (dto.category !== undefined) updateData.category = dto.category || null;
@@ -246,6 +248,8 @@ export class ActivitiesService {
   }
 
   async incrementParticipants(id: string): Promise<ActivityResponseDto> {
+    // Use atomic update with capacity check to prevent race conditions
+    // First, verify activity exists
     const activity = await this.prisma.activity.findUnique({
       where: { id },
     });
@@ -254,21 +258,36 @@ export class ActivitiesService {
       throw new NotFoundException(`Activity with ID ${id} not found`);
     }
 
-    if (activity.current_participants >= activity.max_participants) {
+    // Use raw SQL for atomic conditional update to prevent race conditions
+    // This ensures only one concurrent request can increment when under capacity
+    const updateResult = await this.prisma.$executeRaw`
+      UPDATE activities
+      SET current_participants = current_participants + 1,
+          updated_at = NOW()
+      WHERE id = ${id}::uuid
+        AND current_participants < max_participants
+    `;
+
+    // If no rows were updated, the activity is at capacity
+    if (updateResult === 0) {
       throw new BadRequestException('Activity is already at full capacity');
     }
 
-    const updated = await this.prisma.activity.update({
+    // Fetch the updated activity
+    const updated = await this.prisma.activity.findUnique({
       where: { id },
-      data: {
-        current_participants: activity.current_participants + 1,
-      },
     });
+
+    if (!updated) {
+      throw new NotFoundException(`Activity with ID ${id} not found after update`);
+    }
 
     return this.mapToResponseDto(updated);
   }
 
   async decrementParticipants(id: string): Promise<ActivityResponseDto> {
+    // Use atomic update to prevent race conditions
+    // First, verify activity exists
     const activity = await this.prisma.activity.findUnique({
       where: { id },
     });
@@ -277,21 +296,34 @@ export class ActivitiesService {
       throw new NotFoundException(`Activity with ID ${id} not found`);
     }
 
-    if (activity.current_participants <= 0) {
+    // Use raw SQL for atomic conditional update to prevent race conditions
+    // This ensures only one concurrent request can decrement when above zero
+    const updateResult = await this.prisma.$executeRaw`
+      UPDATE activities
+      SET current_participants = current_participants - 1,
+          updated_at = NOW()
+      WHERE id = ${id}::uuid
+        AND current_participants > 0
+    `;
+
+    // If no rows were updated, the activity already has zero participants
+    if (updateResult === 0) {
       throw new BadRequestException('Activity already has zero participants');
     }
 
-    const updated = await this.prisma.activity.update({
+    // Fetch the updated activity
+    const updated = await this.prisma.activity.findUnique({
       where: { id },
-      data: {
-        current_participants: activity.current_participants - 1,
-      },
     });
+
+    if (!updated) {
+      throw new NotFoundException(`Activity with ID ${id} not found after update`);
+    }
 
     return this.mapToResponseDto(updated);
   }
 
-  private mapToResponseDto(activity: any): ActivityResponseDto {
+  private mapToResponseDto(activity: Activity): ActivityResponseDto {
     return {
       id: activity.id,
       hostId: activity.host_id,

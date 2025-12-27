@@ -59,6 +59,7 @@ export class ActivitiesController {
               message: error instanceof Error ? error.message : 'Unknown error',
             },
           ],
+          HttpStatus.INTERNAL_SERVER_ERROR,
         ),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -73,10 +74,10 @@ export class ActivitiesController {
     @Query('limit') limit?: string,
   ) {
     this.logger.debug('Fetching activities list');
-    const pageNum = page ? parseInt(page, 10) : undefined;
-    const limitNum = limit ? parseInt(limit, 10) : undefined;
+    const pageNum = page !== undefined ? parseInt(page, 10) : undefined;
+    const limitNum = limit !== undefined ? parseInt(limit, 10) : undefined;
 
-    if (pageNum && (isNaN(pageNum) || pageNum < 1)) {
+    if (pageNum !== undefined && (isNaN(pageNum) || pageNum < 1)) {
       throw new HttpException(
         this.buildErrorResponse(
           '/activities',
@@ -88,12 +89,13 @@ export class ActivitiesController {
               message: 'Page must be a positive integer',
             },
           ],
+          HttpStatus.BAD_REQUEST,
         ),
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    if (limitNum && (isNaN(limitNum) || limitNum < 1 || limitNum > 100)) {
+    if (limitNum !== undefined && (isNaN(limitNum) || limitNum < 1 || limitNum > 100)) {
       throw new HttpException(
         this.buildErrorResponse(
           '/activities',
@@ -105,6 +107,7 @@ export class ActivitiesController {
               message: 'Limit must be between 1 and 100',
             },
           ],
+          HttpStatus.BAD_REQUEST,
         ),
         HttpStatus.BAD_REQUEST,
       );
@@ -157,6 +160,7 @@ export class ActivitiesController {
               message: error instanceof Error ? error.message : 'Unknown error',
             },
           ],
+          HttpStatus.INTERNAL_SERVER_ERROR,
         ),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -192,6 +196,7 @@ export class ActivitiesController {
               message: error instanceof Error ? error.message : 'Unknown error',
             },
           ],
+          HttpStatus.INTERNAL_SERVER_ERROR,
         ),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -202,10 +207,12 @@ export class ActivitiesController {
     path: string,
     message: string,
     details: ErrorDetail[],
+    statusCode: number = 400,
   ): StandardErrorResponse {
     return {
-      success: false,
+      statusCode,
       error: message,
+      message,
       path,
       details,
       timestamp: new Date().toISOString(),
