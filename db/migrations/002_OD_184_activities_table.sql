@@ -3,13 +3,17 @@
 -- Ticket: OD-184
 -- Run this in Supabase SQL Editor
 
--- Create activity_status enum type
-CREATE TYPE public.activity_status AS ENUM (
-  'draft',
-  'published',
-  'completed',
-  'cancelled'
-);
+-- Create activity_status enum type (if it doesn't exist)
+DO $$ BEGIN
+  CREATE TYPE public.activity_status AS ENUM (
+    'draft',
+    'published',
+    'completed',
+    'cancelled'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 -- Create activities table
 CREATE TABLE IF NOT EXISTS public.activities (
@@ -62,24 +66,24 @@ CREATE TABLE IF NOT EXISTS public.activities (
   )
 );
 
--- Create indexes for performance
-CREATE INDEX idx_activities_host_id ON public.activities(host_id);
-CREATE INDEX idx_activities_created_at ON public.activities(created_at DESC);
-CREATE INDEX idx_activities_activity_date ON public.activities(activity_date);
-CREATE INDEX idx_activities_status ON public.activities(status);
-CREATE INDEX idx_activities_category ON public.activities(category) WHERE category IS NOT NULL;
+-- Create indexes for performance (idempotent - will skip if already exists)
+CREATE INDEX IF NOT EXISTS idx_activities_host_id ON public.activities(host_id);
+CREATE INDEX IF NOT EXISTS idx_activities_created_at ON public.activities(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activities_activity_date ON public.activities(activity_date);
+CREATE INDEX IF NOT EXISTS idx_activities_status ON public.activities(status);
+CREATE INDEX IF NOT EXISTS idx_activities_category ON public.activities(category) WHERE category IS NOT NULL;
 
 -- GIN indexes for JSONB columns (for efficient querying)
-CREATE INDEX idx_activities_interests_gin ON public.activities USING GIN (interests);
-CREATE INDEX idx_activities_location_gin ON public.activities USING GIN (location);
+CREATE INDEX IF NOT EXISTS idx_activities_interests_gin ON public.activities USING GIN (interests);
+CREATE INDEX IF NOT EXISTS idx_activities_location_gin ON public.activities USING GIN (location);
 
 -- Composite index for common queries (status + date for feed)
-CREATE INDEX idx_activities_status_date ON public.activities(status, activity_date DESC) 
+CREATE INDEX IF NOT EXISTS idx_activities_status_date ON public.activities(status, activity_date DESC) 
   WHERE status = 'published';
 
 -- Additional indexes for common query patterns
-CREATE INDEX idx_activities_is_public ON public.activities(is_public) WHERE is_public = true;
-CREATE INDEX idx_activities_host_status ON public.activities(host_id, status);
+CREATE INDEX IF NOT EXISTS idx_activities_is_public ON public.activities(is_public) WHERE is_public = true;
+CREATE INDEX IF NOT EXISTS idx_activities_host_status ON public.activities(host_id, status);
 
 -- Trigger for auto-updating updated_at
 CREATE OR REPLACE FUNCTION update_activities_timestamp()
@@ -90,6 +94,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Create trigger (idempotent - drops and recreates if exists)
+DROP TRIGGER IF EXISTS update_activities_timestamp ON public.activities;
 CREATE TRIGGER update_activities_timestamp
 BEFORE UPDATE ON public.activities
 FOR EACH ROW
