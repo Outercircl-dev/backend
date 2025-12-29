@@ -21,6 +21,7 @@ describe('ActivitiesService', () => {
     interest: {
       findMany: jest.fn(),
     },
+    $executeRaw: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -389,12 +390,15 @@ describe('ActivitiesService', () => {
 
       const updated = { ...activity, current_participants: 6 };
 
-      mockPrismaService.activity.findUnique.mockResolvedValue(activity);
-      mockPrismaService.activity.update.mockResolvedValue(updated);
+      mockPrismaService.activity.findUnique
+        .mockResolvedValueOnce(activity) // First call: verify activity exists
+        .mockResolvedValueOnce(updated); // Second call: fetch updated activity
+      mockPrismaService.$executeRaw.mockResolvedValue(1); // 1 row updated
 
       const result = await service.incrementParticipants('activity-123');
 
       expect(result.currentParticipants).toBe(6);
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when at capacity', async () => {
@@ -418,10 +422,12 @@ describe('ActivitiesService', () => {
       };
 
       mockPrismaService.activity.findUnique.mockResolvedValue(activity);
+      mockPrismaService.$executeRaw.mockResolvedValue(0); // 0 rows updated (at capacity)
 
       await expect(service.incrementParticipants('activity-123')).rejects.toThrow(
         BadRequestException,
       );
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
     });
   });
 
@@ -448,12 +454,15 @@ describe('ActivitiesService', () => {
 
       const updated = { ...activity, current_participants: 4 };
 
-      mockPrismaService.activity.findUnique.mockResolvedValue(activity);
-      mockPrismaService.activity.update.mockResolvedValue(updated);
+      mockPrismaService.activity.findUnique
+        .mockResolvedValueOnce(activity) // First call: verify activity exists
+        .mockResolvedValueOnce(updated); // Second call: fetch updated activity
+      mockPrismaService.$executeRaw.mockResolvedValue(1); // 1 row updated
 
       const result = await service.decrementParticipants('activity-123');
 
       expect(result.currentParticipants).toBe(4);
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when already at 0', async () => {
@@ -477,10 +486,12 @@ describe('ActivitiesService', () => {
       };
 
       mockPrismaService.activity.findUnique.mockResolvedValue(activity);
+      mockPrismaService.$executeRaw.mockResolvedValue(0); // 0 rows updated (already at 0)
 
       await expect(service.decrementParticipants('activity-123')).rejects.toThrow(
         BadRequestException,
       );
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
     });
   });
 });
