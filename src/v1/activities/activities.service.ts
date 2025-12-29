@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { ActivityResponseDto } from './dto/activity-response.dto';
-import { Prisma, Activity } from '@prisma/client';
+import { Prisma } from 'src/generated/prisma/client';
 
 @Injectable()
 export class ActivitiesService {
@@ -60,6 +60,11 @@ export class ActivitiesService {
       }
     }
 
+    // Convert time strings to Date objects for Prisma Time fields
+    // Prisma Time fields expect Date objects with time components set
+    const startTimeDate = this.convertTimeStringToDate(dto.startTime);
+    const endTimeDate = dto.endTime ? this.convertTimeStringToDate(dto.endTime) : null;
+
     // Create activity with default status 'draft'
     const activity = await this.prisma.activity.create({
       data: {
@@ -68,10 +73,10 @@ export class ActivitiesService {
         description: dto.description || null,
         category: dto.category || null,
         interests: dto.interests,
-        location: dto.location,
+        location: dto.location as any, // Cast to any for Prisma JSON type
         activity_date: activityDate,
-        start_time: dto.startTime,
-        end_time: dto.endTime || null,
+        start_time: startTimeDate,
+        end_time: endTimeDate,
         max_participants: dto.maxParticipants,
         current_participants: 0,
         status: 'draft',
@@ -111,7 +116,7 @@ export class ActivitiesService {
     ]);
 
     return {
-      items: items.map((item: Activity) => this.mapToResponseDto(item)),
+      items: items.map((item) => this.mapToResponseDto(item)),
       total,
       page,
       limit,
@@ -185,21 +190,27 @@ export class ActivitiesService {
     const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
     let startTime = existing.start_time;
     let endTime = existing.end_time;
+    
+    // Convert existing time (Date) to string for comparison
+    const existingStartTimeStr = this.convertDateToTimeString(existing.start_time);
+    const existingEndTimeStr = existing.end_time ? this.convertDateToTimeString(existing.end_time) : null;
+    
     if (dto.startTime) {
       if (!timeFormatRegex.test(dto.startTime)) {
         throw new BadRequestException('Invalid start time format. Use HH:mm or HH:mm:ss');
       }
-      startTime = dto.startTime;
+      startTime = this.convertTimeStringToDate(dto.startTime);
     }
 
     if (dto.endTime) {
       if (!timeFormatRegex.test(dto.endTime)) {
         throw new BadRequestException('Invalid end time format. Use HH:mm or HH:mm:ss');
       }
-      endTime = dto.endTime;
+      endTime = this.convertTimeStringToDate(dto.endTime);
 
       // Validate end time is after start time
-      const startTimeParts = (dto.startTime || existing.start_time).split(':');
+      const startTimeStr = dto.startTime || existingStartTimeStr;
+      const startTimeParts = startTimeStr.split(':');
       const endTimeParts = dto.endTime.split(':');
       const startMinutes = parseInt(startTimeParts[0]) * 60 + parseInt(startTimeParts[1]);
       const endMinutes = parseInt(endTimeParts[0]) * 60 + parseInt(endTimeParts[1]);
@@ -214,7 +225,7 @@ export class ActivitiesService {
     if (dto.description !== undefined) updateData.description = dto.description || null;
     if (dto.category !== undefined) updateData.category = dto.category || null;
     if (dto.interests !== undefined) updateData.interests = dto.interests;
-    if (dto.location !== undefined) updateData.location = dto.location;
+    if (dto.location !== undefined) updateData.location = dto.location as any; // Cast to any for Prisma JSON type
     if (dto.activityDate !== undefined) updateData.activity_date = activityDate;
     if (dto.startTime !== undefined) updateData.start_time = startTime;
     if (dto.endTime !== undefined) updateData.end_time = endTime || null;
@@ -323,7 +334,7 @@ export class ActivitiesService {
     return this.mapToResponseDto(updated);
   }
 
-  private mapToResponseDto(activity: Activity): ActivityResponseDto {
+  private mapToResponseDto(activity: any): ActivityResponseDto {
     return {
       id: activity.id,
       hostId: activity.host_id,
@@ -333,8 +344,8 @@ export class ActivitiesService {
       interests: activity.interests as string[],
       location: activity.location as { latitude: number; longitude: number; address?: string },
       activityDate: activity.activity_date.toISOString().split('T')[0],
-      startTime: activity.start_time,
-      endTime: activity.end_time,
+      startTime: this.convertDateToTimeString(activity.start_time),
+      endTime: activity.end_time ? this.convertDateToTimeString(activity.end_time) : null,
       maxParticipants: activity.max_participants,
       currentParticipants: activity.current_participants,
       status: activity.status,
@@ -342,6 +353,26 @@ export class ActivitiesService {
       createdAt: activity.created_at,
       updatedAt: activity.updated_at,
     };
+  }
+
+  /**
+   * Convert time string (HH:mm or HH:mm:ss) to Date object for Prisma Time field
+   */
+  private convertTimeStringToDate(timeString: string): Date {
+    const [hours, minutes, seconds = '0'] = timeString.split(':');
+    const date = new Date();
+    date.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
+    return date;
+  }
+
+  /**
+   * Convert Date object (from Prisma Time field) to time string (HH:mm:ss)
+   */
+  private convertDateToTimeString(date: Date): string {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
   }
 }
 
