@@ -297,7 +297,7 @@ enum activity_status {
 /// See migration 002_OD_184_activities_table.sql for full constraint definitions.
 model Activity {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  // Note: host_id references public.user_profiles(user_id) but lacks @relation annotation
+  // Note: host_id references public.user_profiles(id) but lacks @relation annotation
   // This is intentional as Prisma cannot enforce referential integrity across schemas in this setup.
   // The foreign key constraint is enforced at the database level via SQL migration (002_OD_184_activities_table.sql).
   host_id            String          @db.Uuid
@@ -326,6 +326,7 @@ model Activity {
   @@index([category], map: "idx_activities_category")
   @@index([status, activity_date(sort: Desc)], map: "idx_activities_status_date")
   @@index([host_id, status], map: "idx_activities_host_status")
+  @@index([is_public], map: "idx_activities_is_public")
   @@index([interests], map: "idx_activities_interests_gin", type: Gin)
   @@index([location], map: "idx_activities_location_gin", type: Gin)
   @@map("activities")

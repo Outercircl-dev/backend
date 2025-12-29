@@ -18,9 +18,9 @@ END $$;
 -- Create activities table
 CREATE TABLE IF NOT EXISTS public.activities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- Reference user_profiles instead of auth.users for consistency with the rest of the schema
-  -- user_profiles.user_id already references auth.users(id)
-  host_id UUID NOT NULL REFERENCES public.user_profiles(user_id) ON DELETE RESTRICT,
+  -- Reference user_profiles primary key (id) for consistency with standard foreign key conventions
+  -- user_profiles.id is the primary key, and user_profiles.user_id references auth.users(id)
+  host_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE RESTRICT,
   
   -- Basic Information
   title VARCHAR(255) NOT NULL,
