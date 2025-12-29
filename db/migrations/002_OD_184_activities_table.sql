@@ -18,7 +18,9 @@ END $$;
 -- Create activities table
 CREATE TABLE IF NOT EXISTS public.activities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  host_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+  -- Reference user_profiles instead of auth.users for consistency with the rest of the schema
+  -- user_profiles.user_id already references auth.users(id)
+  host_id UUID NOT NULL REFERENCES public.user_profiles(user_id) ON DELETE RESTRICT,
   
   -- Basic Information
   title VARCHAR(255) NOT NULL,
@@ -29,15 +31,20 @@ CREATE TABLE IF NOT EXISTS public.activities (
   -- Note: Interest slugs are validated at the application/service layer before insert/update
   -- to ensure they exist in the public.interests table. This validation cannot be enforced
   -- via foreign key constraints since interests is a JSONB array.
+  -- Note: Empty arrays are allowed initially; interests can be added later when publishing.
   interests JSONB NOT NULL DEFAULT '[]'::jsonb, -- Array of interest slugs/IDs
   
   -- Location (for Proximity Score calculation)
   location JSONB NOT NULL, -- { latitude: number, longitude: number, address?: string }
   
   -- Date & Time (for Availability Score calculation)
+  -- Note: timezone_name stores IANA timezone identifier (e.g., 'America/Los_Angeles')
+  -- to handle multi-location events correctly. Application layer should compose
+  -- TIMESTAMPTZ from date+time+timezone when needed.
   activity_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME,
+  timezone_name VARCHAR(100), -- IANA timezone identifier (e.g., 'America/Los_Angeles', 'Europe/London')
   
   -- Participants
   max_participants INT NOT NULL CHECK (max_participants > 0),
@@ -53,12 +60,9 @@ CREATE TABLE IF NOT EXISTS public.activities (
   
   -- Constraints
   CONSTRAINT current_participants_not_exceed_max CHECK (current_participants <= max_participants),
-  CONSTRAINT end_time_after_start_time CHECK (
-    end_time IS NULL OR end_time > start_time
-  ),
-  CONSTRAINT interests_array_not_empty CHECK (
-    jsonb_array_length(interests) > 0
-  ),
+  -- Note: Overnight activities (spanning midnight) are not validated at DB level.
+  -- Application layer should validate end_time > start_time for same-day activities,
+  -- or use end_date for multi-day/overnight activities.
   CONSTRAINT location_has_coordinates CHECK (
     location ? 'latitude' AND location ? 'longitude' AND
     (location->>'latitude')::numeric BETWEEN -90 AND 90 AND
@@ -106,5 +110,6 @@ COMMENT ON TABLE public.activities IS 'Activities/events that users can join. Us
 COMMENT ON COLUMN public.activities.interests IS 'Array of interest slugs/IDs for matching with user interests';
 COMMENT ON COLUMN public.activities.location IS 'JSON object with latitude, longitude, and optional address for proximity calculations';
 COMMENT ON COLUMN public.activities.activity_date IS 'Date when the activity occurs';
+COMMENT ON COLUMN public.activities.timezone_name IS 'IANA timezone identifier (e.g., America/Los_Angeles) for handling multi-location events';
 COMMENT ON COLUMN public.activities.status IS 'Activity status: draft (not visible), published (visible in feed), completed, cancelled';
 
