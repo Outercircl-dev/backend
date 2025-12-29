@@ -29,33 +29,20 @@ export class ActivitiesService {
       }
     }
 
-    // Validate location format
-    if (!dto.location.latitude || !dto.location.longitude) {
-      throw new BadRequestException('Location must have latitude and longitude');
-    }
-
-    // Validate date/time
+    // Parse activity date (DTO already validates format via @IsDateString)
     const activityDate = new Date(dto.activityDate);
-    if (isNaN(activityDate.getTime())) {
-      throw new BadRequestException('Invalid activity date format');
-    }
 
-    // Validate time format using regex (hours 00-23, minutes/seconds 00-59)
-    const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
-    if (!timeFormatRegex.test(dto.startTime)) {
-      throw new BadRequestException('Invalid start time format. Use HH:mm or HH:mm:ss');
-    }
-
+    // Validate end time is after start time (including seconds)
     if (dto.endTime) {
-      if (!timeFormatRegex.test(dto.endTime)) {
-        throw new BadRequestException('Invalid end time format. Use HH:mm or HH:mm:ss');
-      }
-      // Basic validation: end time should be after start time
       const startTimeParts = dto.startTime.split(':');
       const endTimeParts = dto.endTime.split(':');
-      const startMinutes = parseInt(startTimeParts[0]) * 60 + parseInt(startTimeParts[1]);
-      const endMinutes = parseInt(endTimeParts[0]) * 60 + parseInt(endTimeParts[1]);
-      if (endMinutes <= startMinutes) {
+      const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
+                          parseInt(startTimeParts[1]) * 60 + 
+                          (parseInt(startTimeParts[2] || '0'));
+      const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
+                        parseInt(endTimeParts[1]) * 60 + 
+                        (parseInt(endTimeParts[2] || '0'));
+      if (endSeconds <= startSeconds) {
         throw new BadRequestException('End time must be after start time');
       }
     }
@@ -79,7 +66,7 @@ export class ActivitiesService {
         end_time: endTimeDate,
         max_participants: dto.maxParticipants,
         current_participants: 0,
-        status: 'draft',
+        status: 'draft' as const,
         is_public: dto.isPublic ?? true,
       },
     });
@@ -99,7 +86,13 @@ export class ActivitiesService {
 
     const where: Prisma.ActivityWhereInput = {};
     if (filters?.status) {
-      where.status = filters.status;
+      // Validate and cast status to enum type
+      const validStatuses = ['draft', 'published', 'completed', 'cancelled'] as const;
+      if (validStatuses.includes(filters.status as any)) {
+        where.status = filters.status as any; // Cast to any to satisfy Prisma enum type
+      } else {
+        throw new BadRequestException(`Invalid status: ${filters.status}. Must be one of: ${validStatuses.join(', ')}`);
+      }
     }
     if (filters?.hostId) {
       where.host_id = filters.hostId;
@@ -170,51 +163,37 @@ export class ActivitiesService {
       }
     }
 
-    // Validate location if provided
-    if (dto.location) {
-      if (!dto.location.latitude || !dto.location.longitude) {
-        throw new BadRequestException('Location must have latitude and longitude');
-      }
-    }
-
-    // Validate date/time if provided
+    // Parse activity date if provided (DTO already validates format via @IsDateString)
     let activityDate = existing.activity_date;
     if (dto.activityDate) {
       activityDate = new Date(dto.activityDate);
-      if (isNaN(activityDate.getTime())) {
-        throw new BadRequestException('Invalid activity date format');
-      }
     }
 
-    // Validate times if provided
-    const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
+    // Handle times if provided
     let startTime = existing.start_time;
     let endTime = existing.end_time;
     
     // Convert existing time (Date) to string for comparison
     const existingStartTimeStr = this.convertDateToTimeString(existing.start_time);
-    const existingEndTimeStr = existing.end_time ? this.convertDateToTimeString(existing.end_time) : null;
     
     if (dto.startTime) {
-      if (!timeFormatRegex.test(dto.startTime)) {
-        throw new BadRequestException('Invalid start time format. Use HH:mm or HH:mm:ss');
-      }
       startTime = this.convertTimeStringToDate(dto.startTime);
     }
 
     if (dto.endTime) {
-      if (!timeFormatRegex.test(dto.endTime)) {
-        throw new BadRequestException('Invalid end time format. Use HH:mm or HH:mm:ss');
-      }
       endTime = this.convertTimeStringToDate(dto.endTime);
 
-      // Validate end time is after start time
+      // Validate end time is after start time (including seconds)
       const startTimeStr = dto.startTime || existingStartTimeStr;
       const startTimeParts = startTimeStr.split(':');
       const endTimeParts = dto.endTime.split(':');
-      const startMinutes = parseInt(startTimeParts[0]) * 60 + parseInt(startTimeParts[1]);
-      const endMinutes = parseInt(endTimeParts[0]) * 60 + parseInt(endTimeParts[1]);
-      if (endMinutes <= startMinutes) {
+      const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
+                          parseInt(startTimeParts[1]) * 60 + 
+                          (parseInt(startTimeParts[2] || '0'));
+      const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
+                        parseInt(endTimeParts[1]) * 60 + 
+                        (parseInt(endTimeParts[2] || '0'));
+      if (endSeconds <= startSeconds) {
         throw new BadRequestException('End time must be after start time');
       }
     }
