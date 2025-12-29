@@ -366,9 +366,22 @@ export class ActivitiesService {
   }
 
   /**
-   * Convert Date object (from Prisma Time field) to time string (HH:mm:ss)
+   * Convert Date object or time string (from Prisma Time field) to time string (HH:mm:ss)
+   * Handles both Date objects and string formats for flexibility
    */
-  private convertDateToTimeString(date: Date): string {
+  private convertDateToTimeString(date: Date | string): string {
+    // If it's already a string, return it (ensuring HH:mm:ss format)
+    if (typeof date === 'string') {
+      const parts = date.split(':');
+      if (parts.length === 2) {
+        // HH:mm format, add seconds
+        return `${parts[0]}:${parts[1]}:00`;
+      }
+      // Already in HH:mm:ss format
+      return date;
+    }
+    
+    // It's a Date object
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     const seconds = date.getSeconds().toString().padStart(2, '0');
