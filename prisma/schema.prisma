@@ -286,20 +286,12 @@ enum activity_status {
   @@schema("public")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// Database-level CHECK constraints (enforced at DB level, not in Prisma):
-/// - max_participants > 0 (inline CHECK)
-/// - current_participants >= 0 (inline CHECK)
-/// - current_participants_not_exceed_max: current_participants <= max_participants
-/// - location_has_coordinates: location must contain valid latitude (-90 to 90) and longitude (-180 to 180)
-/// Note: Overnight activities (spanning midnight) are validated at the application layer, not at DB level.
-/// Note: Empty interests arrays are allowed; validation is done at the application layer.
-/// See migration 002_OD_184_activities_table.sql for full constraint definitions.
 model Activity {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  // Note: host_id references public.user_profiles(id) but lacks @relation annotation
-  // This is intentional as Prisma cannot enforce referential integrity across schemas in this setup.
-  // The foreign key constraint is enforced at the database level via SQL migration (002_OD_184_activities_table.sql).
+  // Note: host_id references auth.users(id) but lacks @relation annotation
+  // This is intentional as auth.users is Supabase-managed and Prisma cannot enforce
+  // referential integrity across schemas. The foreign key constraint is enforced
+  // at the database level via SQL migration.
   host_id            String          @db.Uuid
   title              String          @db.VarChar(255)
   description        String?
@@ -309,24 +301,18 @@ model Activity {
   activity_date      DateTime        @db.Date
   start_time         DateTime        @db.Time(6)
   end_time           DateTime?       @db.Time(6)
-  // IANA timezone identifier (e.g., 'America/Los_Angeles') for multi-location events
-  // Application layer should compose TIMESTAMPTZ from date+time+timezone when needed
-  timezone_name      String?         @db.VarChar(100)
   max_participants   Int
   current_participants Int           @default(0)
   status             activity_status @default(draft)
   is_public          Boolean         @default(true)
   created_at         DateTime?       @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?       @updatedAt @db.Timestamptz(6)
 
   @@index([host_id], map: "idx_activities_host_id")
   @@index([created_at(sort: Desc)], map: "idx_activities_created_at")
   @@index([activity_date], map: "idx_activities_activity_date")
   @@index([status], map: "idx_activities_status")
   @@index([category], map: "idx_activities_category")
-  @@index([status, activity_date(sort: Desc)], map: "idx_activities_status_date")
-  @@index([host_id, status], map: "idx_activities_host_status")
-  @@index([is_public], map: "idx_activities_is_public")
   @@index([interests], map: "idx_activities_interests_gin", type: Gin)
   @@index([location], map: "idx_activities_location_gin", type: Gin)
   @@map("activities")
