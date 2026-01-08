@@ -25,7 +25,7 @@ import type { ErrorDetail, StandardErrorResponse } from 'src/common/interfaces/s
 export class ActivitiesController {
   private readonly logger = new Logger(ActivitiesController.name, { timestamp: true });
 
-  constructor(private readonly activitiesService: ActivitiesService) {}
+  constructor(private readonly activitiesService: ActivitiesService) { }
 
   @UseGuards(SupabaseAuthGuard)
   @Post()
@@ -50,6 +50,7 @@ export class ActivitiesController {
       this.logger.error('Error creating activity', error);
       throw new HttpException(
         this.buildErrorResponse(
+          HttpStatus.INTERNAL_SERVER_ERROR,
           req?.url ?? '/activities',
           'Failed to create activity',
           [
@@ -59,7 +60,6 @@ export class ActivitiesController {
               message: error instanceof Error ? error.message : 'Unknown error',
             },
           ],
-          HttpStatus.INTERNAL_SERVER_ERROR,
         ),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -80,6 +80,7 @@ export class ActivitiesController {
     if (pageNum !== undefined && (isNaN(pageNum) || pageNum < 1)) {
       throw new HttpException(
         this.buildErrorResponse(
+          HttpStatus.BAD_REQUEST,
           '/activities',
           'Invalid page parameter',
           [
@@ -89,7 +90,6 @@ export class ActivitiesController {
               message: 'Page must be a positive integer',
             },
           ],
-          HttpStatus.BAD_REQUEST,
         ),
         HttpStatus.BAD_REQUEST,
       );
@@ -98,6 +98,7 @@ export class ActivitiesController {
     if (limitNum !== undefined && (isNaN(limitNum) || limitNum < 1 || limitNum > 100)) {
       throw new HttpException(
         this.buildErrorResponse(
+          HttpStatus.BAD_REQUEST,
           '/activities',
           'Invalid limit parameter',
           [
@@ -107,7 +108,6 @@ export class ActivitiesController {
               message: 'Limit must be between 1 and 100',
             },
           ],
-          HttpStatus.BAD_REQUEST,
         ),
         HttpStatus.BAD_REQUEST,
       );
@@ -151,6 +151,7 @@ export class ActivitiesController {
       this.logger.error(`Error updating activity ${id}`, error);
       throw new HttpException(
         this.buildErrorResponse(
+          HttpStatus.INTERNAL_SERVER_ERROR,
           req?.url ?? `/activities/${id}`,
           'Failed to update activity',
           [
@@ -160,7 +161,6 @@ export class ActivitiesController {
               message: error instanceof Error ? error.message : 'Unknown error',
             },
           ],
-          HttpStatus.INTERNAL_SERVER_ERROR,
         ),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -187,6 +187,7 @@ export class ActivitiesController {
       this.logger.error(`Error deleting activity ${id}`, error);
       throw new HttpException(
         this.buildErrorResponse(
+          HttpStatus.INTERNAL_SERVER_ERROR,
           req?.url ?? `/activities/${id}`,
           'Failed to delete activity',
           [
@@ -196,7 +197,6 @@ export class ActivitiesController {
               message: error instanceof Error ? error.message : 'Unknown error',
             },
           ],
-          HttpStatus.INTERNAL_SERVER_ERROR,
         ),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -204,14 +204,13 @@ export class ActivitiesController {
   }
 
   private buildErrorResponse(
+    statusCode: number,
     path: string,
     message: string,
     details: ErrorDetail[],
-    statusCode: number = 400,
   ): StandardErrorResponse {
     return {
       statusCode,
-      error: message,
       message,
       path,
       details,

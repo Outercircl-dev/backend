@@ -24,6 +24,7 @@ export class ProfileController {
         if (!profile) {
             throw new HttpException(
                 this.buildErrorResponse(
+                    HttpStatus.NOT_FOUND,
                     req?.url ?? '/profile',
                     'Profile not found',
                     [{
@@ -132,6 +133,7 @@ export class ProfileController {
 
         if (errors.length > 0) {
             const errorResponse = this.buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
                 req?.url ?? '/profile',
                 'Missing required fields',
                 errors,
@@ -175,6 +177,7 @@ export class ProfileController {
 
         if (!hasAtLeastOneField) {
             const errorResponse = this.buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
                 req?.url ?? '/profile',
                 'No updatable fields provided',
                 [{
@@ -204,13 +207,12 @@ export class ProfileController {
         return { success: true };
     }
 
-    private buildErrorResponse(path: string, message: string, details: ErrorDetail[]): StandardErrorResponse {
+    private buildErrorResponse(statusCode: number, path: string, message: string, details: ErrorDetail[]): StandardErrorResponse {
         return {
-            statusCode: 400,
-            error: 'Bad Request',
+            statusCode,
             message,
-            details,
             path,
+            details,
             timestamp: new Date().toISOString(),
         };
     }

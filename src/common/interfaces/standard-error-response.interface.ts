@@ -6,10 +6,9 @@ export interface ErrorDetail {
 
 export interface StandardErrorResponse {
     statusCode: number;
-    error: string;
     message: string;
-    details?: ErrorDetail[];
-    path?: string;
+    path: string;
+    details: ErrorDetail[];
     timestamp: string;
 }
 
