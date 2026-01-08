@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "src/prisma/prisma.service";
 
 export interface ProfileInput {
@@ -115,9 +115,24 @@ export class ProfileService {
     }
 
     async deleteProfile(userId: string) {
-        return this.prisma.user_profiles.delete({
+        const profile = await this.prisma.user_profiles.findUnique({
             where: { user_id: userId },
+            select: { id: true },
         });
+
+        if (!profile) {
+            throw new NotFoundException("Profile not found");
+        }
+
+        // Clean up hosted activities before deleting the profile to avoid FK violations.
+        return this.prisma.$transaction([
+            this.prisma.activity.deleteMany({
+                where: { host_id: profile.id },
+            }),
+            this.prisma.user_profiles.delete({
+                where: { user_id: userId },
+            }),
+        ]);
     }
 
     private parseDateOrThrow(dateString: string): Date {

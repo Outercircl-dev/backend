@@ -12,6 +12,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import configuration from './config/configuration';
 import { validate } from './config/validation';
 import { ProfileModule } from './v1/profile/profile.module';
+import { ActivitiesModule } from './v1/activities/activities.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { ProfileModule } from './v1/profile/profile.module';
     MeModule,
     InterestsModule,
     PrismaModule,
-    ProfileModule
+    ProfileModule,
+    ActivitiesModule
   ],
   controllers: [AppController],
   providers: [AppService],
