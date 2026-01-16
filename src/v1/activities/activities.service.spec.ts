@@ -10,7 +10,7 @@ describe('ActivitiesService', () => {
   let prismaService: PrismaService;
 
   const mockPrismaService = {
-    activities: {
+    activity: {
       create: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -18,7 +18,7 @@ describe('ActivitiesService', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
-    interests: {
+    interest: {
       findMany: jest.fn(),
     },
     $executeRaw: jest.fn(),
@@ -89,25 +89,25 @@ describe('ActivitiesService', () => {
         updated_at: new Date(),
       };
 
-      mockPrismaService.interests.findMany.mockResolvedValue(mockInterests);
-      mockPrismaService.activities.create.mockResolvedValue(mockActivity);
+      mockPrismaService.interest.findMany.mockResolvedValue(mockInterests);
+      mockPrismaService.activity.create.mockResolvedValue(mockActivity);
 
       const result = await service.create(hostId, createDto);
 
-      expect(mockPrismaService.interests.findMany).toHaveBeenCalledWith({
+      expect(mockPrismaService.interest.findMany).toHaveBeenCalledWith({
         where: { slug: { in: createDto.interests } },
         select: { slug: true },
       });
-      expect(mockPrismaService.activities.create).toHaveBeenCalled();
+      expect(mockPrismaService.activity.create).toHaveBeenCalled();
       expect(result.id).toBe('activity-123');
       expect(result.status).toBe('draft');
     });
 
     it('should throw BadRequestException for invalid interests', async () => {
-      mockPrismaService.interests.findMany.mockResolvedValue([{ slug: 'basketball' }]);
+      mockPrismaService.interest.findMany.mockResolvedValue([{ slug: 'basketball' }]);
 
       await expect(service.create(hostId, createDto)).rejects.toThrow(BadRequestException);
-      expect(mockPrismaService.activities.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.activity.create).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException for invalid location', async () => {
@@ -117,7 +117,7 @@ describe('ActivitiesService', () => {
 
     it('should throw BadRequestException when end time is before start time', async () => {
       const invalidDto = { ...createDto, startTime: '12:00', endTime: '10:00' };
-      mockPrismaService.interests.findMany.mockResolvedValue([
+      mockPrismaService.interest.findMany.mockResolvedValue([
         { slug: 'basketball' },
         { slug: 'football' },
       ]);
@@ -149,8 +149,8 @@ describe('ActivitiesService', () => {
         },
       ];
 
-      mockPrismaService.activities.findMany.mockResolvedValue(mockActivities);
-      mockPrismaService.activities.count.mockResolvedValue(1);
+      mockPrismaService.activity.findMany.mockResolvedValue(mockActivities);
+      mockPrismaService.activity.count.mockResolvedValue(1);
 
       const result = await service.findAll({ page: 1, limit: 20 });
 
@@ -161,12 +161,12 @@ describe('ActivitiesService', () => {
     });
 
     it('should filter by status', async () => {
-      mockPrismaService.activities.findMany.mockResolvedValue([]);
-      mockPrismaService.activities.count.mockResolvedValue(0);
+      mockPrismaService.activity.findMany.mockResolvedValue([]);
+      mockPrismaService.activity.count.mockResolvedValue(0);
 
       await service.findAll({ status: 'published' });
 
-      expect(mockPrismaService.activities.findMany).toHaveBeenCalledWith(
+      expect(mockPrismaService.activity.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { status: 'published' },
         }),
@@ -174,12 +174,12 @@ describe('ActivitiesService', () => {
     });
 
     it('should filter by hostId', async () => {
-      mockPrismaService.activities.findMany.mockResolvedValue([]);
-      mockPrismaService.activities.count.mockResolvedValue(0);
+      mockPrismaService.activity.findMany.mockResolvedValue([]);
+      mockPrismaService.activity.count.mockResolvedValue(0);
 
       await service.findAll({ hostId: 'host-123' });
 
-      expect(mockPrismaService.activities.findMany).toHaveBeenCalledWith(
+      expect(mockPrismaService.activity.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { host_id: 'host-123' },
         }),
@@ -208,18 +208,18 @@ describe('ActivitiesService', () => {
         updated_at: new Date(),
       };
 
-      mockPrismaService.activities.findUnique.mockResolvedValue(mockActivity);
+      mockPrismaService.activity.findUnique.mockResolvedValue(mockActivity);
 
       const result = await service.findOne('activity-123');
 
       expect(result.id).toBe('activity-123');
-      expect(mockPrismaService.activities.findUnique).toHaveBeenCalledWith({
+      expect(mockPrismaService.activity.findUnique).toHaveBeenCalledWith({
         where: { id: 'activity-123' },
       });
     });
 
     it('should throw NotFoundException when activity not found', async () => {
-      mockPrismaService.activities.findUnique.mockResolvedValue(null);
+      mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
       await expect(service.findOne('non-existent')).rejects.toThrow(NotFoundException);
     });
@@ -254,13 +254,13 @@ describe('ActivitiesService', () => {
 
       const updatedActivity = { ...existingActivity, title: 'Updated Title' };
 
-      mockPrismaService.activities.findUnique.mockResolvedValue(existingActivity);
-      mockPrismaService.activities.update.mockResolvedValue(updatedActivity);
+      mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
+      mockPrismaService.activity.update.mockResolvedValue(updatedActivity);
 
       const result = await service.update(activityId, hostId, updateDto);
 
       expect(result.title).toBe('Updated Title');
-      expect(mockPrismaService.activities.update).toHaveBeenCalled();
+      expect(mockPrismaService.activity.update).toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException when user is not host', async () => {
@@ -283,16 +283,16 @@ describe('ActivitiesService', () => {
         updated_at: new Date(),
       };
 
-      mockPrismaService.activities.findUnique.mockResolvedValue(existingActivity);
+      mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
 
       await expect(service.update(activityId, hostId, updateDto)).rejects.toThrow(
         ForbiddenException,
       );
-      expect(mockPrismaService.activities.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.activity.update).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when activity not found', async () => {
-      mockPrismaService.activities.findUnique.mockResolvedValue(null);
+      mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
       await expect(service.update(activityId, hostId, updateDto)).rejects.toThrow(
         NotFoundException,
@@ -324,12 +324,12 @@ describe('ActivitiesService', () => {
         updated_at: new Date(),
       };
 
-      mockPrismaService.activities.findUnique.mockResolvedValue(existingActivity);
-      mockPrismaService.activities.delete.mockResolvedValue(existingActivity);
+      mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
+      mockPrismaService.activity.delete.mockResolvedValue(existingActivity);
 
       await service.remove(activityId, hostId);
 
-      expect(mockPrismaService.activities.delete).toHaveBeenCalledWith({
+      expect(mockPrismaService.activity.delete).toHaveBeenCalledWith({
         where: { id: activityId },
       });
     });
@@ -354,14 +354,14 @@ describe('ActivitiesService', () => {
         updated_at: new Date(),
       };
 
-      mockPrismaService.activities.findUnique.mockResolvedValue(existingActivity);
+      mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
 
       await expect(service.remove(activityId, hostId)).rejects.toThrow(ForbiddenException);
-      expect(mockPrismaService.activities.delete).not.toHaveBeenCalled();
+      expect(mockPrismaService.activity.delete).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when activity not found', async () => {
-      mockPrismaService.activities.findUnique.mockResolvedValue(null);
+      mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
       await expect(service.remove(activityId, hostId)).rejects.toThrow(NotFoundException);
     });
@@ -390,7 +390,7 @@ describe('ActivitiesService', () => {
 
       const updated = { ...activity, current_participants: 6 };
 
-      mockPrismaService.activities.findUnique
+      mockPrismaService.activity.findUnique
         .mockResolvedValueOnce(activity) // First call: verify activity exists
         .mockResolvedValueOnce(updated); // Second call: fetch updated activity
       mockPrismaService.$executeRaw.mockResolvedValue(1); // 1 row updated
@@ -421,7 +421,7 @@ describe('ActivitiesService', () => {
         updated_at: new Date(),
       };
 
-      mockPrismaService.activities.findUnique.mockResolvedValue(activity);
+      mockPrismaService.activity.findUnique.mockResolvedValue(activity);
       mockPrismaService.$executeRaw.mockResolvedValue(0); // 0 rows updated (at capacity)
 
       await expect(service.incrementParticipants('activity-123')).rejects.toThrow(
@@ -454,7 +454,7 @@ describe('ActivitiesService', () => {
 
       const updated = { ...activity, current_participants: 4 };
 
-      mockPrismaService.activities.findUnique
+      mockPrismaService.activity.findUnique
         .mockResolvedValueOnce(activity) // First call: verify activity exists
         .mockResolvedValueOnce(updated); // Second call: fetch updated activity
       mockPrismaService.$executeRaw.mockResolvedValue(1); // 1 row updated
@@ -485,7 +485,7 @@ describe('ActivitiesService', () => {
         updated_at: new Date(),
       };
 
-      mockPrismaService.activities.findUnique.mockResolvedValue(activity);
+      mockPrismaService.activity.findUnique.mockResolvedValue(activity);
       mockPrismaService.$executeRaw.mockResolvedValue(0); // 0 rows updated (already at 0)
 
       await expect(service.decrementParticipants('activity-123')).rejects.toThrow(

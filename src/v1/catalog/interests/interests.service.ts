@@ -6,7 +6,7 @@ export class InterestsService {
   constructor(private readonly prisma: PrismaService) { }
 
   async getInterestsCatalog() {
-    const rows = await this.prisma.interests.findMany({
+    const rows = await this.prisma.interest.findMany({
       orderBy: [{ category: 'asc' }, { sort_order: 'asc' }],
       select: {
         id: true,

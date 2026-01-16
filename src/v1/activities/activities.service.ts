@@ -12,15 +12,15 @@ export class ActivitiesService {
   async create(hostId: string, dto: CreateActivityDto): Promise<ActivityResponseDto> {
     // Validate interests exist in the interests table
     if (dto.interests && dto.interests.length > 0) {
-      const existingInterests = await this.prisma.interests.findMany({
+      const existingInterests = await this.prisma.interest.findMany({
         where: {
           slug: { in: dto.interests },
         },
         select: { slug: true },
       });
 
-      const existingSlugs = existingInterests.map((i) => i.slug);
-      const invalidInterests = dto.interests.filter((slug) => !existingSlugs.includes(slug));
+      const existingSlugs = existingInterests.map((interest: { slug: string }) => interest.slug);
+      const invalidInterests = dto.interests.filter((slug: string) => !existingSlugs.includes(slug));
 
       if (invalidInterests.length > 0) {
         throw new BadRequestException(
@@ -53,7 +53,7 @@ export class ActivitiesService {
     const endTimeDate = dto.endTime ? this.convertTimeStringToDate(dto.endTime) : null;
 
     // Create activity with default status 'draft'
-    const activity = await this.prisma.activities.create({
+    const activity = await this.prisma.activity.create({
       data: {
         host_id: hostId,
         title: dto.title,
@@ -84,7 +84,7 @@ export class ActivitiesService {
     const limit = filters?.limit || 20;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.activitiesWhereInput = {};
+    const where: Prisma.ActivityWhereInput = {};
     if (filters?.status) {
       // Validate and cast status to enum type
       const validStatuses = ['draft', 'published', 'completed', 'cancelled'] as const;
@@ -99,17 +99,17 @@ export class ActivitiesService {
     }
 
     const [items, total] = await Promise.all([
-      this.prisma.activities.findMany({
+      this.prisma.activity.findMany({
         where,
         skip,
         take: limit,
         orderBy: { created_at: 'desc' },
       }),
-      this.prisma.activities.count({ where }),
+      this.prisma.activity.count({ where }),
     ]);
 
     return {
-      items: items.map((item) => this.mapToResponseDto(item)),
+      items: items.map((item: any) => this.mapToResponseDto(item)),
       total,
       page,
       limit,
@@ -118,7 +118,7 @@ export class ActivitiesService {
   }
 
   async findOne(id: string): Promise<ActivityResponseDto> {
-    const activity = await this.prisma.activities.findUnique({
+    const activity = await this.prisma.activity.findUnique({
       where: { id },
     });
 
@@ -131,7 +131,7 @@ export class ActivitiesService {
 
   async update(id: string, hostId: string, dto: UpdateActivityDto): Promise<ActivityResponseDto> {
     // Check if activity exists
-    const existing = await this.prisma.activities.findUnique({
+    const existing = await this.prisma.activity.findUnique({
       where: { id },
     });
 
@@ -146,15 +146,15 @@ export class ActivitiesService {
 
     // Validate interests if provided
     if (dto.interests && dto.interests.length > 0) {
-      const existingInterests = await this.prisma.interests.findMany({
+      const existingInterests = await this.prisma.interest.findMany({
         where: {
           slug: { in: dto.interests },
         },
         select: { slug: true },
       });
 
-      const existingSlugs = existingInterests.map((i) => i.slug);
-      const invalidInterests = dto.interests.filter((slug) => !existingSlugs.includes(slug));
+      const existingSlugs = existingInterests.map((interest: { slug: string }) => interest.slug);
+      const invalidInterests = dto.interests.filter((slug: string) => !existingSlugs.includes(slug));
 
       if (invalidInterests.length > 0) {
         throw new BadRequestException(
@@ -199,7 +199,7 @@ export class ActivitiesService {
     }
 
     // Build update data
-    const updateData: Prisma.activitiesUpdateInput = {};
+    const updateData: Prisma.ActivityUpdateInput = {};
     if (dto.title !== undefined) updateData.title = dto.title;
     if (dto.description !== undefined) updateData.description = dto.description || null;
     if (dto.category !== undefined) updateData.category = dto.category || null;
@@ -211,7 +211,7 @@ export class ActivitiesService {
     if (dto.maxParticipants !== undefined) updateData.max_participants = dto.maxParticipants;
     if (dto.isPublic !== undefined) updateData.is_public = dto.isPublic;
 
-    const activity = await this.prisma.activities.update({
+    const activity = await this.prisma.activity.update({
       where: { id },
       data: updateData,
     });
@@ -220,7 +220,7 @@ export class ActivitiesService {
   }
 
   async remove(id: string, hostId: string): Promise<void> {
-    const activity = await this.prisma.activities.findUnique({
+    const activity = await this.prisma.activity.findUnique({
       where: { id },
     });
 
@@ -232,7 +232,7 @@ export class ActivitiesService {
       throw new ForbiddenException('You can only delete your own activities');
     }
 
-    await this.prisma.activities.delete({
+    await this.prisma.activity.delete({
       where: { id },
     });
   }
@@ -240,7 +240,7 @@ export class ActivitiesService {
   async incrementParticipants(id: string): Promise<ActivityResponseDto> {
     // Use atomic update with capacity check to prevent race conditions
     // First, verify activity exists
-    const activity = await this.prisma.activities.findUnique({
+    const activity = await this.prisma.activity.findUnique({
       where: { id },
     });
 
@@ -264,7 +264,7 @@ export class ActivitiesService {
     }
 
     // Fetch the updated activity
-    const updated = await this.prisma.activities.findUnique({
+    const updated = await this.prisma.activity.findUnique({
       where: { id },
     });
 
@@ -278,7 +278,7 @@ export class ActivitiesService {
   async decrementParticipants(id: string): Promise<ActivityResponseDto> {
     // Use atomic update to prevent race conditions
     // First, verify activity exists
-    const activity = await this.prisma.activities.findUnique({
+    const activity = await this.prisma.activity.findUnique({
       where: { id },
     });
 
@@ -302,7 +302,7 @@ export class ActivitiesService {
     }
 
     // Fetch the updated activity
-    const updated = await this.prisma.activities.findUnique({
+    const updated = await this.prisma.activity.findUnique({
       where: { id },
     });
 
