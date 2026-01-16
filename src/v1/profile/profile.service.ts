@@ -126,7 +126,7 @@ export class ProfileService {
 
         // Clean up hosted activities before deleting the profile to avoid FK violations.
         return this.prisma.$transaction([
-            this.prisma.activity.deleteMany({
+            this.prisma.activities.deleteMany({
                 where: { host_id: profile.id },
             }),
             this.prisma.user_profiles.delete({
