@@ -23,10 +23,14 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
         }
 
         const token = authHeader.split(" ")[1];
+        // Log minimal token diagnostics to help debug verification issues.
+        this.logger.debug(`Supabase JWT header present. tokenLength=${token?.length ?? 0} tokenPrefix=${token?.slice(0, 12) ?? ''}`);
 
         try {
             const payload = await verifySupabaseJwt(token);
-            this.logger.debug(`JWT Token verification completed. Payload = ${payload}`);
+            const sanitizedPayload = this.sanitizePayload(payload);
+            const payloadPreview = typeof sanitizedPayload === 'object' ? JSON.stringify(sanitizedPayload) : String(sanitizedPayload);
+            this.logger.debug(`JWT Token verification completed. payload=${payloadPreview}`);
 
             if (!payload.sub) {
                 throw new UnauthorizedException("Missing sub in JWT");
@@ -39,8 +43,33 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
                 raw: payload,
             };
         } catch (err) {
-            console.error("JWT verification error:", err);
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.error(`Supabase JWT verification error: ${message}`, err instanceof Error ? err.stack : undefined);
             throw new UnauthorizedException("Invalid Supabase token");
         }
+    }
+
+    private sanitizePayload(payload: SupabaseJwtPayload | unknown): Record<string, unknown> {
+        if (!payload || typeof payload !== 'object') {
+            return { type: typeof payload };
+        }
+
+        const input = payload as SupabaseJwtPayload;
+        const sanitized: Record<string, unknown> = {};
+
+        if (input.sub) sanitized.sub = this.maskValue(input.sub);
+        if (input.iss) sanitized.iss = input.iss;
+        if (input.aud) sanitized.aud = input.aud;
+        if (input.iat) sanitized.iat = input.iat;
+        if (input.exp) sanitized.exp = input.exp;
+        if (input.role) sanitized.role = input.role;
+
+        return sanitized;
+    }
+
+    private maskValue(value: string): string {
+        if (!value) return '';
+        if (value.length <= 6) return `${value[0]}***${value[value.length - 1]}`;
+        return `${value.slice(0, 3)}***${value.slice(-3)}`;
     }
 }

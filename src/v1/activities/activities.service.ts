@@ -19,8 +19,8 @@ export class ActivitiesService {
         select: { slug: true },
       });
 
-      const existingSlugs = existingInterests.map((i) => i.slug);
-      const invalidInterests = dto.interests.filter((slug) => !existingSlugs.includes(slug));
+      const existingSlugs = existingInterests.map((interest: { slug: string }) => interest.slug);
+      const invalidInterests = dto.interests.filter((slug: string) => !existingSlugs.includes(slug));
 
       if (invalidInterests.length > 0) {
         throw new BadRequestException(
@@ -109,7 +109,7 @@ export class ActivitiesService {
     ]);
 
     return {
-      items: items.map((item) => this.mapToResponseDto(item)),
+      items: items.map((item: any) => this.mapToResponseDto(item)),
       total,
       page,
       limit,
@@ -153,8 +153,8 @@ export class ActivitiesService {
         select: { slug: true },
       });
 
-      const existingSlugs = existingInterests.map((i) => i.slug);
-      const invalidInterests = dto.interests.filter((slug) => !existingSlugs.includes(slug));
+      const existingSlugs = existingInterests.map((interest: { slug: string }) => interest.slug);
+      const invalidInterests = dto.interests.filter((slug: string) => !existingSlugs.includes(slug));
 
       if (invalidInterests.length > 0) {
         throw new BadRequestException(
