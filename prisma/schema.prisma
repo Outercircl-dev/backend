@@ -47,9 +47,12 @@ model user_profiles {
   confirmed_age          Boolean     @default(false)
   confirmed_platonic     Boolean     @default(false)
 
-  activityParticipants   ActivityParticipant[]
-  issuedActivityInvites  ActivityInvite[] @relation("issuer_profile")
-  receivedActivityInvites ActivityInvite[] @relation("invitee_profile")
+  activityParticipants    ActivityParticipant[]
+  issuedActivityInvites   ActivityInvite[]      @relation("issuer_profile")
+  receivedActivityInvites ActivityInvite[]      @relation("invitee_profile")
+  activityGroups          ActivityGroup[]
+  activityGroupMembers    ActivityGroupMember[]
+  activitySeries          ActivitySeries[]
 
   @@index([created_at(sort: Desc)], map: "idx_user_profiles_created_at")
   @@index([interests], map: "idx_user_profiles_interests", type: Gin)
@@ -308,30 +311,49 @@ enum invite_status {
   @@schema("public")
 }
 
+enum recurrence_frequency {
+  daily
+  weekly
+  monthly
+
+  @@schema("public")
+}
+
+enum group_member_role {
+  owner
+  member
+
+  @@schema("public")
+}
+
 model Activity {
-  id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   // Note: host_id references auth.users(id) but lacks @relation annotation
   // This is intentional as auth.users is Supabase-managed and Prisma cannot enforce
   // referential integrity across schemas. The foreign key constraint is enforced
   // at the database level via SQL migration.
-  host_id            String          @db.Uuid
-  title              String          @db.VarChar(255)
-  description        String?
-  category           String?         @db.VarChar(50)
-  interests          Json            @default("[]")
-  location           Json
-  activity_date      DateTime        @db.Date
-  start_time         DateTime        @db.Time(6)
-  end_time           DateTime?       @db.Time(6)
-  max_participants   Int
-  current_participants Int           @default(0)
-  status             activity_status @default(draft)
-  is_public          Boolean         @default(true)
-  created_at         DateTime?       @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime?       @updatedAt @db.Timestamptz(6)
+  host_id              String          @db.Uuid
+  title                String          @db.VarChar(255)
+  description          String?
+  category             String?         @db.VarChar(50)
+  interests            Json            @default("[]")
+  location             Json
+  activity_date        DateTime        @db.Date
+  start_time           DateTime        @db.Time(6)
+  end_time             DateTime?       @db.Time(6)
+  max_participants     Int
+  current_participants Int             @default(0)
+  status               activity_status @default(draft)
+  is_public            Boolean         @default(true)
+  created_at           DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?       @updatedAt @db.Timestamptz(6)
+  group_id             String?         @db.Uuid
+  series_id            String?         @db.Uuid
 
   participants ActivityParticipant[]
   invites      ActivityInvite[]
+  group        ActivityGroup?        @relation(fields: [group_id], references: [id])
+  series       ActivitySeries?       @relation(fields: [series_id], references: [id])
 
   @@index([host_id], map: "idx_activities_host_id")
   @@index([created_at(sort: Desc)], map: "idx_activities_created_at")
@@ -340,23 +362,78 @@ model Activity {
   @@index([category], map: "idx_activities_category")
   @@index([interests], map: "idx_activities_interests_gin", type: Gin)
   @@index([location], map: "idx_activities_location_gin", type: Gin)
+  @@index([group_id], map: "idx_activities_group_id")
+  @@index([series_id], map: "idx_activities_series_id")
   @@map("activities")
   @@schema("public")
 }
 
+model ActivityGroup {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_profile_id String    @db.Uuid
+  name             String    @db.VarChar(120)
+  description      String?
+  is_public        Boolean   @default(false)
+  max_members      Int       @default(15)
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @updatedAt @db.Timestamptz(6)
+
+  owner      user_profiles         @relation(fields: [owner_profile_id], references: [id], onDelete: Cascade)
+  members    ActivityGroupMember[]
+  activities Activity[]
+
+  @@index([owner_profile_id], map: "idx_activity_groups_owner_id")
+  @@map("activity_groups")
+  @@schema("public")
+}
+
+model ActivityGroupMember {
+  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id   String            @db.Uuid
+  profile_id String            @db.Uuid
+  role       group_member_role @default(member)
+  joined_at  DateTime?         @default(now()) @db.Timestamptz(6)
+
+  group   ActivityGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  profile user_profiles @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@unique([group_id, profile_id], map: "uq_activity_group_membership")
+  @@index([profile_id], map: "idx_activity_group_members_profile")
+  @@map("activity_group_members")
+  @@schema("public")
+}
+
+model ActivitySeries {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_profile_id String               @db.Uuid
+  frequency        recurrence_frequency
+  interval         Int                  @default(1)
+  ends_on          DateTime?            @db.Date
+  occurrences      Int?
+  created_at       DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?            @updatedAt @db.Timestamptz(6)
+
+  owner      user_profiles @relation(fields: [owner_profile_id], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@index([owner_profile_id], map: "idx_activity_series_owner_id")
+  @@map("activity_series")
+  @@schema("public")
+}
+
 model ActivityParticipant {
-  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  activity_id        String               @db.Uuid
-  profile_id         String               @db.Uuid
-  status             participation_status @default(pending)
-  waitlist_position  Int?
-  approval_message   String?
-  invite_code        String?
-  metadata           Json?                @default("{}")
-  joined_at          DateTime?            @default(now()) @db.Timestamptz(6)
-  approved_at        DateTime?            @db.Timestamptz(6)
-  cancelled_at       DateTime?            @db.Timestamptz(6)
-  updated_at         DateTime?            @updatedAt @db.Timestamptz(6)
+  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activity_id       String               @db.Uuid
+  profile_id        String               @db.Uuid
+  status            participation_status @default(pending)
+  waitlist_position Int?
+  approval_message  String?
+  invite_code       String?
+  metadata          Json?                @default("{}")
+  joined_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  approved_at       DateTime?            @db.Timestamptz(6)
+  cancelled_at      DateTime?            @db.Timestamptz(6)
+  updated_at        DateTime?            @updatedAt @db.Timestamptz(6)
 
   activity Activity      @relation(fields: [activity_id], references: [id], onDelete: Cascade)
   profile  user_profiles @relation(fields: [profile_id], references: [id], onDelete: Cascade)
@@ -383,8 +460,8 @@ model ActivityInvite {
   created_at         DateTime?     @default(now()) @db.Timestamptz(6)
   updated_at         DateTime?     @updatedAt @db.Timestamptz(6)
 
-  activity       Activity      @relation(fields: [activity_id], references: [id], onDelete: Cascade)
-  issuerProfile  user_profiles @relation("issuer_profile", fields: [issuer_profile_id], references: [id], onDelete: Cascade)
+  activity       Activity       @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  issuerProfile  user_profiles  @relation("issuer_profile", fields: [issuer_profile_id], references: [id], onDelete: Cascade)
   inviteeProfile user_profiles? @relation("invitee_profile", fields: [invitee_profile_id], references: [id])
 
   @@index([activity_id], map: "idx_activity_invites_activity_id")

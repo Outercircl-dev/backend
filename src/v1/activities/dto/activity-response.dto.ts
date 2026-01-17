@@ -28,6 +28,18 @@ export interface ActivityResponseDto {
   waitlistCount: number;
   status: 'draft' | 'published' | 'completed' | 'cancelled';
   isPublic: boolean;
+  group?: {
+    id: string;
+    name: string;
+    isPublic: boolean;
+  } | null;
+  recurrence?: {
+    id: string;
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+    endsOn: string | null;
+    occurrences: number | null;
+  } | null;
   createdAt: Date;
   updatedAt: Date;
   meetingPointHidden: boolean;

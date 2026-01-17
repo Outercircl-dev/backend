@@ -43,7 +43,7 @@ export class ActivitiesController {
     }
 
     try {
-      const activity = await this.activitiesService.create(supabaseUserId, body);
+      const activity = await this.activitiesService.create(req.user, body);
       return activity;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -150,7 +150,7 @@ export class ActivitiesController {
     }
 
     try {
-      const activity = await this.activitiesService.update(id, supabaseUserId, body);
+      const activity = await this.activitiesService.update(id, req.user, body);
       return activity;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -186,7 +186,7 @@ export class ActivitiesController {
     }
 
     try {
-      await this.activitiesService.remove(id, supabaseUserId);
+      await this.activitiesService.remove(id, req.user);
       return { success: true, message: 'Activity deleted successfully' };
     } catch (error) {
       if (error instanceof HttpException) {

@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsObject, IsDateString, IsInt, Min, IsBoolean, ValidateNested, IsNumber, MinLength, Max, ArrayMinSize, Matches } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, IsObject, IsDateString, IsInt, Min, IsBoolean, ValidateNested, IsNumber, MinLength, Max, ArrayMinSize, Matches, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class LocationDto {
@@ -15,6 +15,25 @@ class LocationDto {
   @IsOptional()
   @IsString()
   address?: string;
+}
+
+class RecurrenceDto {
+  @IsString()
+  @IsIn(['daily', 'weekly', 'monthly'])
+  frequency: 'daily' | 'weekly' | 'monthly';
+
+  @IsInt()
+  @Min(1)
+  interval: number;
+
+  @IsOptional()
+  @IsDateString()
+  endsOn?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  occurrences?: number;
 }
 
 export class CreateActivityDto {
@@ -66,5 +85,14 @@ export class CreateActivityDto {
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean;
+
+  @IsOptional()
+  @IsString()
+  groupId?: string | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RecurrenceDto)
+  recurrence?: RecurrenceDto | null;
 }
 

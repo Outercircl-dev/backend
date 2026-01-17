@@ -4,12 +4,20 @@ import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { ActivityResponseDto, ViewerParticipationMeta, ParticipationState } from './dto/activity-response.dto';
 import { Prisma } from 'src/generated/prisma/client';
+import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
+import { assertHostCapacity, assertVerifiedHost, FREE_MAX_HOSTS_PER_MONTH, isPremium } from './hosting-rules';
 
 @Injectable()
 export class ActivitiesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(hostId: string, dto: CreateActivityDto): Promise<ActivityResponseDto> {
+  async create(user: AuthenticatedUser, dto: CreateActivityDto): Promise<ActivityResponseDto> {
+    assertVerifiedHost(user);
+    if (!user?.supabaseUserId) {
+      throw new BadRequestException('supabaseUserId missing from authenticated request');
+    }
+
+    assertHostCapacity(user, dto.maxParticipants);
     // Validate interests exist in the interests table
     if (dto.interests && dto.interests.length > 0) {
       const existingInterests = await this.prisma.interest.findMany({
@@ -52,10 +60,68 @@ export class ActivitiesService {
     const startTimeDate = this.convertTimeStringToDate(dto.startTime);
     const endTimeDate = dto.endTime ? this.convertTimeStringToDate(dto.endTime) : null;
 
-    // Create activity with default status 'draft'
+    if (!isPremium(user)) {
+      const { start, end } = this.getMonthRange(new Date());
+      const hostedCount = await this.prisma.activity.count({
+        where: {
+          host_id: user.supabaseUserId,
+          created_at: {
+            gte: start,
+            lt: end,
+          },
+        },
+      });
+      if (hostedCount >= FREE_MAX_HOSTS_PER_MONTH) {
+        throw new ForbiddenException(`Free tier hosts may only create ${FREE_MAX_HOSTS_PER_MONTH} activities per month`);
+      }
+    }
+
+    const profile = await this.getProfileForUser(user.supabaseUserId);
+
+    let groupId: string | null = null;
+    if (dto.groupId) {
+      if (!isPremium(user)) {
+        throw new ForbiddenException('Only premium hosts can use groups');
+      }
+      const group = await this.prisma.activityGroup.findUnique({
+        where: { id: dto.groupId },
+        select: { id: true, owner_profile_id: true },
+      });
+      if (!group) {
+        throw new BadRequestException('Group not found');
+      }
+      const membership = await this.prisma.activityGroupMember.findUnique({
+        where: {
+          group_id_profile_id: {
+            group_id: dto.groupId,
+            profile_id: profile.id,
+          },
+        },
+      });
+      if (!membership && group.owner_profile_id !== profile.id) {
+        throw new ForbiddenException('You are not a member of this group');
+      }
+      groupId = dto.groupId;
+    }
+
+    let seriesId: string | null = null;
+    if (dto.recurrence) {
+      const series = await this.prisma.activitySeries.create({
+        data: {
+          owner_profile_id: profile.id,
+          frequency: dto.recurrence.frequency,
+          interval: dto.recurrence.interval,
+          ends_on: dto.recurrence.endsOn ? new Date(dto.recurrence.endsOn) : null,
+          occurrences: dto.recurrence.occurrences ?? null,
+        },
+      });
+      seriesId = series.id;
+    }
+
+    // Create activity with default status 'published' so members can join immediately.
     const activity = await this.prisma.activity.create({
       data: {
-        host_id: hostId,
+        host_id: user.supabaseUserId,
         title: dto.title,
         description: dto.description || null,
         category: dto.category || null,
@@ -66,12 +132,14 @@ export class ActivitiesService {
         end_time: endTimeDate,
         max_participants: dto.maxParticipants,
         current_participants: 0,
-        status: 'draft' as const,
+        status: 'published' as const,
         is_public: dto.isPublic ?? true,
+        group: groupId ? { connect: { id: groupId } } : undefined,
+        series: seriesId ? { connect: { id: seriesId } } : undefined,
       },
     });
 
-    return this.mapToResponseDto(activity, hostId);
+    return this.mapToResponseDto(activity, user.supabaseUserId);
   }
 
   async findAll(
@@ -136,7 +204,11 @@ export class ActivitiesService {
     return this.mapToResponseDto(activity, viewerId);
   }
 
-  async update(id: string, hostId: string, dto: UpdateActivityDto): Promise<ActivityResponseDto> {
+  async update(id: string, user: AuthenticatedUser, dto: UpdateActivityDto): Promise<ActivityResponseDto> {
+    assertVerifiedHost(user);
+    if (!user?.supabaseUserId) {
+      throw new BadRequestException('supabaseUserId missing from authenticated request');
+    }
     // Check if activity exists
     const existing = await this.prisma.activity.findUnique({
       where: { id },
@@ -147,8 +219,12 @@ export class ActivitiesService {
     }
 
     // Check if user is the host
-    if (existing.host_id !== hostId) {
+    if (existing.host_id !== user.supabaseUserId) {
       throw new ForbiddenException('You can only update your own activities');
+    }
+
+    if (this.hasActivityStarted(existing)) {
+      throw new ForbiddenException('Activity has already started and can no longer be edited');
     }
 
     // Validate interests if provided
@@ -215,18 +291,72 @@ export class ActivitiesService {
     if (dto.activityDate !== undefined) updateData.activity_date = activityDate;
     if (dto.startTime !== undefined) updateData.start_time = startTime;
     if (dto.endTime !== undefined) updateData.end_time = endTime || null;
-    if (dto.maxParticipants !== undefined) updateData.max_participants = dto.maxParticipants;
+    if (dto.maxParticipants !== undefined) {
+      assertHostCapacity(user, dto.maxParticipants);
+      updateData.max_participants = dto.maxParticipants;
+    }
     if (dto.isPublic !== undefined) updateData.is_public = dto.isPublic;
+    if (dto.groupId !== undefined) {
+      if (dto.groupId === null) {
+        updateData.group = { disconnect: true };
+      } else {
+        if (!isPremium(user)) {
+          throw new ForbiddenException('Only premium hosts can use groups');
+        }
+        const profile = await this.getProfileForUser(user.supabaseUserId);
+        const group = await this.prisma.activityGroup.findUnique({
+          where: { id: dto.groupId },
+          select: { id: true, owner_profile_id: true },
+        });
+        if (!group) {
+          throw new BadRequestException('Group not found');
+        }
+        const membership = await this.prisma.activityGroupMember.findUnique({
+          where: {
+            group_id_profile_id: {
+              group_id: dto.groupId,
+              profile_id: profile.id,
+            },
+          },
+        });
+        if (!membership && group.owner_profile_id !== profile.id) {
+          throw new ForbiddenException('You are not a member of this group');
+        }
+        updateData.group = { connect: { id: dto.groupId } };
+      }
+    }
+
+    if (dto.recurrence !== undefined) {
+      const profile = await this.getProfileForUser(user.supabaseUserId);
+      if (dto.recurrence === null) {
+        updateData.series = { disconnect: true };
+      } else {
+        const series = await this.prisma.activitySeries.create({
+          data: {
+            owner_profile_id: profile.id,
+            frequency: dto.recurrence.frequency,
+            interval: dto.recurrence.interval,
+            ends_on: dto.recurrence.endsOn ? new Date(dto.recurrence.endsOn) : null,
+            occurrences: dto.recurrence.occurrences ?? null,
+          },
+        });
+        updateData.series = { connect: { id: series.id } };
+      }
+    }
 
     const activity = await this.prisma.activity.update({
       where: { id },
       data: updateData,
     });
 
-    return this.mapToResponseDto(activity, hostId);
+    return this.mapToResponseDto(activity, user.supabaseUserId);
   }
 
-  async remove(id: string, hostId: string): Promise<void> {
+  async remove(id: string, user: AuthenticatedUser): Promise<void> {
+    assertVerifiedHost(user);
+    if (!user?.supabaseUserId) {
+      throw new BadRequestException('supabaseUserId missing from authenticated request');
+    }
     const activity = await this.prisma.activity.findUnique({
       where: { id },
     });
@@ -235,7 +365,7 @@ export class ActivitiesService {
       throw new NotFoundException(`Activity with ID ${id} not found`);
     }
 
-    if (activity.host_id !== hostId) {
+    if (activity.host_id !== user.supabaseUserId) {
       throw new ForbiddenException('You can only delete your own activities');
     }
 
@@ -244,8 +374,41 @@ export class ActivitiesService {
     });
   }
 
+  private hasActivityStarted(activity: { activity_date: Date; start_time: Date | string }): boolean {
+    const start = this.buildActivityStart(activity.activity_date, activity.start_time);
+    return start.getTime() <= Date.now();
+  }
+
+  private buildActivityStart(activityDate: Date, startTime: Date | string): Date {
+    const date = new Date(activityDate);
+    if (typeof startTime === 'string') {
+      const [hours, minutes, seconds = '0'] = startTime.split(':');
+      date.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
+      return date;
+    }
+    date.setHours(startTime.getHours(), startTime.getMinutes(), startTime.getSeconds(), 0);
+    return date;
+  }
+
+  private getMonthRange(reference: Date): { start: Date; end: Date } {
+    const start = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    const end = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
+    return { start, end };
+  }
+
+  private async getProfileForUser(supabaseUserId: string) {
+    const profile = await this.prisma.user_profiles.findUnique({
+      where: { user_id: supabaseUserId },
+      select: { id: true },
+    });
+    if (!profile) {
+      throw new BadRequestException('Complete your profile before hosting activities');
+    }
+    return profile;
+  }
+
   private async mapToResponseDto(activity: any, viewerId?: string): Promise<ActivityResponseDto> {
-    const [confirmedCount, waitlistCount, viewerProfile] = await Promise.all([
+    const [confirmedCount, waitlistCount, viewerProfile, group, series] = await Promise.all([
       this.prisma.activityParticipant.count({
         where: { activity_id: activity.id, status: 'confirmed' },
       }),
@@ -256,6 +419,24 @@ export class ActivitiesService {
         ? this.prisma.user_profiles.findUnique({
             where: { user_id: viewerId },
             select: { id: true },
+          })
+        : Promise.resolve(null),
+      activity.group_id
+        ? this.prisma.activityGroup.findUnique({
+            where: { id: activity.group_id },
+            select: { id: true, name: true, is_public: true },
+          })
+        : Promise.resolve(null),
+      activity.series_id
+        ? this.prisma.activitySeries.findUnique({
+            where: { id: activity.series_id },
+            select: {
+              id: true,
+              frequency: true,
+              interval: true,
+              ends_on: true,
+              occurrences: true,
+            },
           })
         : Promise.resolve(null),
     ]);
@@ -293,6 +474,22 @@ export class ActivitiesService {
       waitlistCount,
       status: activity.status,
       isPublic: activity.is_public,
+      group: group
+        ? {
+            id: group.id,
+            name: group.name,
+            isPublic: group.is_public,
+          }
+        : null,
+      recurrence: series
+        ? {
+            id: series.id,
+            frequency: series.frequency,
+            interval: series.interval,
+            endsOn: series.ends_on ? series.ends_on.toISOString().split('T')[0] : null,
+            occurrences: series.occurrences ?? null,
+          }
+        : null,
       createdAt: activity.created_at,
       updatedAt: activity.updated_at,
       meetingPointHidden: !canSeeLocation,
