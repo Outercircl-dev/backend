@@ -101,6 +101,18 @@ The FR3 implementation introduces dedicated endpoints under `/api/activities/:ac
 
 All routes require a Supabase JWT. Public `GET /api/activities` and `GET /api/activities/:id` now accept optional authentication to include viewer-specific metadata such as waitlist position and meeting point visibility.
 
+## Activity Hosting (FR4)
+
+Hosting routes enforce `role === authenticated` from the Supabase JWT and subscription tier limits:
+
+- `POST /api/activities` — Create a new activity (free tier: max 4 participants, 2 hosted per month).
+- `PATCH /api/activities/:id` — Update activity details until the start time.
+- `DELETE /api/activities/:id` — Remove an activity you host.
+- `POST /api/activities/groups` — Premium: create activity groups (max 15 members).
+- `GET /api/activities/groups` — List groups you own or belong to.
+- `PATCH /api/activities/groups/:id` — Premium: update group details.
+- `POST /api/activities/series` — Create a recurrence series (frequency + interval + optional end/occurrences).
+
 ## Support
 
 Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).

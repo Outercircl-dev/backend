@@ -25,6 +25,16 @@ describe('ActivitiesService', () => {
       count: jest.fn(),
       findUnique: jest.fn(),
     },
+    activityGroup: {
+      findUnique: jest.fn(),
+    },
+    activityGroupMember: {
+      findUnique: jest.fn(),
+    },
+    activitySeries: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+    },
     user_profiles: {
       findUnique: jest.fn(),
     },
@@ -47,7 +57,10 @@ describe('ActivitiesService', () => {
     jest.clearAllMocks();
     mockPrismaService.activityParticipant.count.mockResolvedValue(0);
     mockPrismaService.activityParticipant.findUnique.mockResolvedValue(null);
-    mockPrismaService.user_profiles.findUnique.mockResolvedValue(null);
+    mockPrismaService.activityGroup.findUnique.mockResolvedValue(null);
+    mockPrismaService.activityGroupMember.findUnique.mockResolvedValue(null);
+    mockPrismaService.activitySeries.findUnique.mockResolvedValue(null);
+    mockPrismaService.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1' });
   });
 
   it('should be defined', () => {
@@ -56,6 +69,7 @@ describe('ActivitiesService', () => {
 
   describe('create', () => {
     const hostId = 'host-123';
+    const hostUser = { supabaseUserId: hostId, role: 'authenticated', type: 'FREEMIUM' as const };
     const createDto: CreateActivityDto = {
       title: 'Test Activity',
       description: 'Test Description',
@@ -69,7 +83,7 @@ describe('ActivitiesService', () => {
       activityDate: '2025-12-31',
       startTime: '10:00',
       endTime: '12:00',
-      maxParticipants: 10,
+      maxParticipants: 4,
       isPublic: true,
     };
 
@@ -93,6 +107,8 @@ describe('ActivitiesService', () => {
         current_participants: 0,
         status: 'draft',
         is_public: createDto.isPublic,
+        group_id: null,
+        series_id: null,
         created_at: new Date(),
         updated_at: new Date(),
       };
@@ -100,7 +116,7 @@ describe('ActivitiesService', () => {
       mockPrismaService.interest.findMany.mockResolvedValue(mockInterests);
       mockPrismaService.activity.create.mockResolvedValue(mockActivity);
 
-      const result = await service.create(hostId, createDto);
+      const result = await service.create(hostUser, createDto);
 
       expect(mockPrismaService.interest.findMany).toHaveBeenCalledWith({
         where: { slug: { in: createDto.interests } },
@@ -114,13 +130,23 @@ describe('ActivitiesService', () => {
     it('should throw BadRequestException for invalid interests', async () => {
       mockPrismaService.interest.findMany.mockResolvedValue([{ slug: 'basketball' }]);
 
-      await expect(service.create(hostId, createDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(hostUser, createDto)).rejects.toThrow(BadRequestException);
       expect(mockPrismaService.activity.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject non-verified hosts', async () => {
+      const unverifiedUser = { supabaseUserId: hostId, role: 'anonymous', type: 'FREEMIUM' as const };
+      await expect(service.create(unverifiedUser, createDto)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should enforce free-tier participant cap', async () => {
+      const invalidDto = { ...createDto, maxParticipants: 6 };
+      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw BadRequestException for invalid location', async () => {
       const invalidDto = { ...createDto, location: { latitude: 37.7749 } };
-      await expect(service.create(hostId, invalidDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException when end time is before start time', async () => {
@@ -130,7 +156,7 @@ describe('ActivitiesService', () => {
         { slug: 'football' },
       ]);
 
-      await expect(service.create(hostId, invalidDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -205,7 +231,7 @@ describe('ActivitiesService', () => {
         category: 'Sports',
         interests: ['basketball'],
         location: { latitude: 37.7749, longitude: -122.4194 },
-        activity_date: new Date('2025-12-31'),
+        activity_date: new Date('2099-12-31'),
         start_time: '10:00',
         end_time: '12:00',
         max_participants: 10,
@@ -236,6 +262,7 @@ describe('ActivitiesService', () => {
   describe('update', () => {
     const activityId = 'activity-123';
     const hostId = 'host-123';
+    const hostUser = { supabaseUserId: hostId, role: 'authenticated', type: 'FREEMIUM' as const };
     const updateDto: UpdateActivityDto = {
       title: 'Updated Title',
     };
@@ -249,13 +276,15 @@ describe('ActivitiesService', () => {
         category: 'Sports',
         interests: ['basketball'],
         location: { latitude: 37.7749, longitude: -122.4194 },
-        activity_date: new Date('2025-12-31'),
+        activity_date: new Date('2099-12-31'),
         start_time: '10:00',
         end_time: '12:00',
-        max_participants: 10,
+        max_participants: 4,
         current_participants: 5,
         status: 'draft',
         is_public: true,
+        group_id: null,
+        series_id: null,
         created_at: new Date(),
         updated_at: new Date(),
       };
@@ -265,7 +294,7 @@ describe('ActivitiesService', () => {
       mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
       mockPrismaService.activity.update.mockResolvedValue(updatedActivity);
 
-      const result = await service.update(activityId, hostId, updateDto);
+      const result = await service.update(activityId, hostUser, updateDto);
 
       expect(result.title).toBe('Updated Title');
       expect(mockPrismaService.activity.update).toHaveBeenCalled();
@@ -283,17 +312,19 @@ describe('ActivitiesService', () => {
         activity_date: new Date('2025-12-31'),
         start_time: '10:00',
         end_time: '12:00',
-        max_participants: 10,
+        max_participants: 4,
         current_participants: 5,
         status: 'draft',
         is_public: true,
+        group_id: null,
+        series_id: null,
         created_at: new Date(),
         updated_at: new Date(),
       };
 
       mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
 
-      await expect(service.update(activityId, hostId, updateDto)).rejects.toThrow(
+      await expect(service.update(activityId, hostUser, updateDto)).rejects.toThrow(
         ForbiddenException,
       );
       expect(mockPrismaService.activity.update).not.toHaveBeenCalled();
@@ -302,7 +333,7 @@ describe('ActivitiesService', () => {
     it('should throw NotFoundException when activity not found', async () => {
       mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
-      await expect(service.update(activityId, hostId, updateDto)).rejects.toThrow(
+      await expect(service.update(activityId, hostUser, updateDto)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -311,6 +342,7 @@ describe('ActivitiesService', () => {
   describe('remove', () => {
     const activityId = 'activity-123';
     const hostId = 'host-123';
+    const hostUser = { supabaseUserId: hostId, role: 'authenticated', type: 'FREEMIUM' as const };
 
     it('should delete activity when user is host', async () => {
       const existingActivity = {
@@ -324,10 +356,12 @@ describe('ActivitiesService', () => {
         activity_date: new Date('2025-12-31'),
         start_time: '10:00',
         end_time: '12:00',
-        max_participants: 10,
+        max_participants: 4,
         current_participants: 5,
         status: 'draft',
         is_public: true,
+        group_id: null,
+        series_id: null,
         created_at: new Date(),
         updated_at: new Date(),
       };
@@ -335,7 +369,7 @@ describe('ActivitiesService', () => {
       mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
       mockPrismaService.activity.delete.mockResolvedValue(existingActivity);
 
-      await service.remove(activityId, hostId);
+      await service.remove(activityId, hostUser);
 
       expect(mockPrismaService.activity.delete).toHaveBeenCalledWith({
         where: { id: activityId },
@@ -354,24 +388,26 @@ describe('ActivitiesService', () => {
         activity_date: new Date('2025-12-31'),
         start_time: '10:00',
         end_time: '12:00',
-        max_participants: 10,
+        max_participants: 4,
         current_participants: 5,
         status: 'draft',
         is_public: true,
+        group_id: null,
+        series_id: null,
         created_at: new Date(),
         updated_at: new Date(),
       };
 
       mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
 
-      await expect(service.remove(activityId, hostId)).rejects.toThrow(ForbiddenException);
+      await expect(service.remove(activityId, hostUser)).rejects.toThrow(ForbiddenException);
       expect(mockPrismaService.activity.delete).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when activity not found', async () => {
       mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove(activityId, hostId)).rejects.toThrow(NotFoundException);
+      await expect(service.remove(activityId, hostUser)).rejects.toThrow(NotFoundException);
     });
   });
 
