@@ -12,6 +12,7 @@ import { SupabaseAuthGuard } from 'src/auth/supabase-auth.guard';
 import { SubscriptionTier } from 'src/common/enums/subscription-tier.enum';
 import { UsersService } from 'src/users/users.service';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request.interface';
+import { ProfileService } from 'src/v1/profile/profile.service';
 
 interface BackendMeResponse {
   id: string;
@@ -30,7 +31,10 @@ interface UpdateMeRequest {
 export class MeController {
   private readonly logger = new Logger(MeController.name, { timestamp: true });
 
-  constructor(private readonly usersService: UsersService) { }
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly profileService: ProfileService,
+  ) { }
 
   @UseGuards(SupabaseAuthGuard)
   @Get()
@@ -43,11 +47,15 @@ export class MeController {
       );
     }
 
+    this.logger.log('User', user)
+
+    const profile = await this.profileService.getProfile(user.supabaseUserId);
+
     return {
       id: user.supabaseUserId,
       supabaseUserId: user.supabaseUserId,
       email: user.email,
-      hasOnboarded: user.hasOnboarded ?? false,
+      hasOnboarded: Boolean(profile),
       role: user.role,
       type: user.type ?? SubscriptionTier.FREEMIUM,
     };
