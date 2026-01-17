@@ -21,7 +21,13 @@ describe('ActivitiesService', () => {
     interest: {
       findMany: jest.fn(),
     },
-    $executeRaw: jest.fn(),
+    activityParticipant: {
+      count: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    user_profiles: {
+      findUnique: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -38,8 +44,10 @@ describe('ActivitiesService', () => {
     service = module.get<ActivitiesService>(ActivitiesService);
     prismaService = module.get<PrismaService>(PrismaService);
 
-    // Reset all mocks
     jest.clearAllMocks();
+    mockPrismaService.activityParticipant.count.mockResolvedValue(0);
+    mockPrismaService.activityParticipant.findUnique.mockResolvedValue(null);
+    mockPrismaService.user_profiles.findUnique.mockResolvedValue(null);
   });
 
   it('should be defined', () => {
@@ -367,132 +375,6 @@ describe('ActivitiesService', () => {
     });
   });
 
-  describe('incrementParticipants', () => {
-    it('should increment participants when under capacity', async () => {
-      const activity = {
-        id: 'activity-123',
-        host_id: 'host-1',
-        title: 'Test',
-        description: 'Test',
-        category: 'Sports',
-        interests: ['basketball'],
-        location: { latitude: 37.7749, longitude: -122.4194 },
-        activity_date: new Date('2025-12-31'),
-        start_time: '10:00',
-        end_time: '12:00',
-        max_participants: 10,
-        current_participants: 5,
-        status: 'published',
-        is_public: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      const updated = { ...activity, current_participants: 6 };
-
-      mockPrismaService.activity.findUnique
-        .mockResolvedValueOnce(activity) // First call: verify activity exists
-        .mockResolvedValueOnce(updated); // Second call: fetch updated activity
-      mockPrismaService.$executeRaw.mockResolvedValue(1); // 1 row updated
-
-      const result = await service.incrementParticipants('activity-123');
-
-      expect(result.currentParticipants).toBe(6);
-      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
-    });
-
-    it('should throw BadRequestException when at capacity', async () => {
-      const activity = {
-        id: 'activity-123',
-        host_id: 'host-1',
-        title: 'Test',
-        description: 'Test',
-        category: 'Sports',
-        interests: ['basketball'],
-        location: { latitude: 37.7749, longitude: -122.4194 },
-        activity_date: new Date('2025-12-31'),
-        start_time: '10:00',
-        end_time: '12:00',
-        max_participants: 10,
-        current_participants: 10,
-        status: 'published',
-        is_public: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      mockPrismaService.activity.findUnique.mockResolvedValue(activity);
-      mockPrismaService.$executeRaw.mockResolvedValue(0); // 0 rows updated (at capacity)
-
-      await expect(service.incrementParticipants('activity-123')).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
-    });
-  });
-
-  describe('decrementParticipants', () => {
-    it('should decrement participants when > 0', async () => {
-      const activity = {
-        id: 'activity-123',
-        host_id: 'host-1',
-        title: 'Test',
-        description: 'Test',
-        category: 'Sports',
-        interests: ['basketball'],
-        location: { latitude: 37.7749, longitude: -122.4194 },
-        activity_date: new Date('2025-12-31'),
-        start_time: '10:00',
-        end_time: '12:00',
-        max_participants: 10,
-        current_participants: 5,
-        status: 'published',
-        is_public: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      const updated = { ...activity, current_participants: 4 };
-
-      mockPrismaService.activity.findUnique
-        .mockResolvedValueOnce(activity) // First call: verify activity exists
-        .mockResolvedValueOnce(updated); // Second call: fetch updated activity
-      mockPrismaService.$executeRaw.mockResolvedValue(1); // 1 row updated
-
-      const result = await service.decrementParticipants('activity-123');
-
-      expect(result.currentParticipants).toBe(4);
-      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
-    });
-
-    it('should throw BadRequestException when already at 0', async () => {
-      const activity = {
-        id: 'activity-123',
-        host_id: 'host-1',
-        title: 'Test',
-        description: 'Test',
-        category: 'Sports',
-        interests: ['basketball'],
-        location: { latitude: 37.7749, longitude: -122.4194 },
-        activity_date: new Date('2025-12-31'),
-        start_time: '10:00',
-        end_time: '12:00',
-        max_participants: 10,
-        current_participants: 0,
-        status: 'published',
-        is_public: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-      };
-
-      mockPrismaService.activity.findUnique.mockResolvedValue(activity);
-      mockPrismaService.$executeRaw.mockResolvedValue(0); // 0 rows updated (already at 0)
-
-      await expect(service.decrementParticipants('activity-123')).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
-    });
-  });
+  // Legacy participant increment/decrement functionality moved to ParticipantsService tests.
 });
 

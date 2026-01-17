@@ -1,3 +1,13 @@
+export type ParticipationState = 'not_joined' | 'pending' | 'confirmed' | 'waitlisted';
+
+export interface ViewerParticipationMeta {
+  participantId: string;
+  status: ParticipationState;
+  waitlistPosition: number | null;
+  joinedAt: Date | null;
+  approvedAt: Date | null;
+}
+
 export interface ActivityResponseDto {
   id: string;
   hostId: string;
@@ -15,9 +25,12 @@ export interface ActivityResponseDto {
   endTime: string | null;
   maxParticipants: number;
   currentParticipants: number;
+  waitlistCount: number;
   status: 'draft' | 'published' | 'completed' | 'cancelled';
   isPublic: boolean;
   createdAt: Date;
   updatedAt: Date;
+  meetingPointHidden: boolean;
+  viewerParticipation?: ViewerParticipationMeta;
 }
 

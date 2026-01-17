@@ -90,6 +90,17 @@ Check out a few resources that may come in handy when working with NestJS:
 - To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
 - Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
+## Activity Participation API
+
+The FR3 implementation introduces dedicated endpoints under `/api/activities/:activityId/participants`:
+
+- `POST /api/activities/:activityId/participants` — Join or request access to an activity.
+- `DELETE /api/activities/:activityId/participants/:participantId` — Cancel your participation (hosts can cancel on behalf of members).
+- `PATCH /api/activities/:activityId/participants/:participantId` — Host-only endpoint to approve or reject participants.
+- `GET /api/activities/:activityId/participants` — Host-only roster with statuses, waitlist order, and approval messages.
+
+All routes require a Supabase JWT. Public `GET /api/activities` and `GET /api/activities/:id` now accept optional authentication to include viewer-specific metadata such as waitlist position and meeting point visibility.
+
 ## Support
 
 Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
