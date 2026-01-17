@@ -47,6 +47,10 @@ model user_profiles {
   confirmed_age          Boolean     @default(false)
   confirmed_platonic     Boolean     @default(false)
 
+  activityParticipants   ActivityParticipant[]
+  issuedActivityInvites  ActivityInvite[] @relation("issuer_profile")
+  receivedActivityInvites ActivityInvite[] @relation("invitee_profile")
+
   @@index([created_at(sort: Desc)], map: "idx_user_profiles_created_at")
   @@index([interests], map: "idx_user_profiles_interests", type: Gin)
   @@index([user_id], map: "idx_user_profiles_user_id")
@@ -286,6 +290,24 @@ enum activity_status {
   @@schema("public")
 }
 
+enum participation_status {
+  pending
+  confirmed
+  waitlisted
+  cancelled
+
+  @@schema("public")
+}
+
+enum invite_status {
+  pending
+  redeemed
+  revoked
+  expired
+
+  @@schema("public")
+}
+
 model Activity {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   // Note: host_id references auth.users(id) but lacks @relation annotation
@@ -308,6 +330,9 @@ model Activity {
   created_at         DateTime?       @default(now()) @db.Timestamptz(6)
   updated_at         DateTime?       @updatedAt @db.Timestamptz(6)
 
+  participants ActivityParticipant[]
+  invites      ActivityInvite[]
+
   @@index([host_id], map: "idx_activities_host_id")
   @@index([created_at(sort: Desc)], map: "idx_activities_created_at")
   @@index([activity_date], map: "idx_activities_activity_date")
@@ -316,5 +341,55 @@ model Activity {
   @@index([interests], map: "idx_activities_interests_gin", type: Gin)
   @@index([location], map: "idx_activities_location_gin", type: Gin)
   @@map("activities")
+  @@schema("public")
+}
+
+model ActivityParticipant {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activity_id        String               @db.Uuid
+  profile_id         String               @db.Uuid
+  status             participation_status @default(pending)
+  waitlist_position  Int?
+  approval_message   String?
+  invite_code        String?
+  metadata           Json?                @default("{}")
+  joined_at          DateTime?            @default(now()) @db.Timestamptz(6)
+  approved_at        DateTime?            @db.Timestamptz(6)
+  cancelled_at       DateTime?            @db.Timestamptz(6)
+  updated_at         DateTime?            @updatedAt @db.Timestamptz(6)
+
+  activity Activity      @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  profile  user_profiles @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@unique([activity_id, profile_id], map: "uq_activity_participants_activity_profile")
+  @@index([activity_id, status], map: "idx_activity_participants_status")
+  @@index([profile_id], map: "idx_activity_participants_profile_id")
+  @@map("activity_participants")
+  @@schema("public")
+}
+
+model ActivityInvite {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activity_id        String        @db.Uuid
+  issuer_profile_id  String        @db.Uuid
+  invitee_profile_id String?       @db.Uuid
+  invitee_email      String?       @db.VarChar(255)
+  code               String        @unique @db.VarChar(32)
+  status             invite_status @default(pending)
+  metadata           Json?         @default("{}")
+  expires_at         DateTime?     @db.Timestamptz(6)
+  redeemed_at        DateTime?     @db.Timestamptz(6)
+  revoked_at         DateTime?     @db.Timestamptz(6)
+  created_at         DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?     @updatedAt @db.Timestamptz(6)
+
+  activity       Activity      @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  issuerProfile  user_profiles @relation("issuer_profile", fields: [issuer_profile_id], references: [id], onDelete: Cascade)
+  inviteeProfile user_profiles? @relation("invitee_profile", fields: [invitee_profile_id], references: [id])
+
+  @@index([activity_id], map: "idx_activity_invites_activity_id")
+  @@index([issuer_profile_id], map: "idx_activity_invites_issuer_id")
+  @@index([invitee_profile_id], map: "idx_activity_invites_invitee_id")
+  @@map("activity_invites")
   @@schema("public")
 }

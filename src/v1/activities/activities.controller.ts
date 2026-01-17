@@ -18,7 +18,9 @@ import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { SupabaseAuthGuard } from 'src/auth/supabase-auth.guard';
+import { OptionalSupabaseAuthGuard } from 'src/auth/optional-supabase-auth.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request.interface';
+import type { OptionalAuthenticatedRequest } from 'src/common/interfaces/optional-authenticated-request.interface';
 import type { ErrorDetail, StandardErrorResponse } from 'src/common/interfaces/standard-error-response.interface';
 
 @Controller('activities')
@@ -66,8 +68,10 @@ export class ActivitiesController {
     }
   }
 
+  @UseGuards(OptionalSupabaseAuthGuard)
   @Get()
   async findAll(
+    @Req() req: OptionalAuthenticatedRequest,
     @Query('status') status?: string,
     @Query('hostId') hostId?: string,
     @Query('page') page?: string,
@@ -113,18 +117,22 @@ export class ActivitiesController {
       );
     }
 
-    return this.activitiesService.findAll({
-      status,
-      hostId,
-      page: pageNum,
-      limit: limitNum,
-    });
+    return this.activitiesService.findAll(
+      {
+        status,
+        hostId,
+        page: pageNum,
+        limit: limitNum,
+      },
+      req.user?.supabaseUserId,
+    );
   }
 
+  @UseGuards(OptionalSupabaseAuthGuard)
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  async findOne(@Req() req: OptionalAuthenticatedRequest, @Param('id') id: string) {
     this.logger.debug(`Fetching activity with ID: ${id}`);
-    return this.activitiesService.findOne(id);
+    return this.activitiesService.findOne(id, req.user?.supabaseUserId);
   }
 
   @UseGuards(SupabaseAuthGuard)

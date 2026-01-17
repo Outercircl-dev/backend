@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
-import { ActivityResponseDto } from './dto/activity-response.dto';
+import { ActivityResponseDto, ViewerParticipationMeta, ParticipationState } from './dto/activity-response.dto';
 import { Prisma } from 'src/generated/prisma/client';
 
 @Injectable()
@@ -71,15 +71,18 @@ export class ActivitiesService {
       },
     });
 
-    return this.mapToResponseDto(activity);
+    return this.mapToResponseDto(activity, hostId);
   }
 
-  async findAll(filters?: {
-    status?: string;
-    hostId?: string;
-    page?: number;
-    limit?: number;
-  }): Promise<{ items: ActivityResponseDto[]; total: number; page: number; limit: number; totalPages: number }> {
+  async findAll(
+    filters?: {
+      status?: string;
+      hostId?: string;
+      page?: number;
+      limit?: number;
+    },
+    viewerId?: string,
+  ): Promise<{ items: ActivityResponseDto[]; total: number; page: number; limit: number; totalPages: number }> {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
     const skip = (page - 1) * limit;
@@ -98,7 +101,7 @@ export class ActivitiesService {
       where.host_id = filters.hostId;
     }
 
-    const [items, total] = await Promise.all([
+    const [activities, total] = await Promise.all([
       this.prisma.activity.findMany({
         where,
         skip,
@@ -108,8 +111,12 @@ export class ActivitiesService {
       this.prisma.activity.count({ where }),
     ]);
 
+    const items = await Promise.all(
+      activities.map((item: any) => this.mapToResponseDto(item, viewerId)),
+    );
+
     return {
-      items: items.map((item: any) => this.mapToResponseDto(item)),
+      items,
       total,
       page,
       limit,
@@ -117,7 +124,7 @@ export class ActivitiesService {
     };
   }
 
-  async findOne(id: string): Promise<ActivityResponseDto> {
+  async findOne(id: string, viewerId?: string): Promise<ActivityResponseDto> {
     const activity = await this.prisma.activity.findUnique({
       where: { id },
     });
@@ -126,7 +133,7 @@ export class ActivitiesService {
       throw new NotFoundException(`Activity with ID ${id} not found`);
     }
 
-    return this.mapToResponseDto(activity);
+    return this.mapToResponseDto(activity, viewerId);
   }
 
   async update(id: string, hostId: string, dto: UpdateActivityDto): Promise<ActivityResponseDto> {
@@ -216,7 +223,7 @@ export class ActivitiesService {
       data: updateData,
     });
 
-    return this.mapToResponseDto(activity);
+    return this.mapToResponseDto(activity, hostId);
   }
 
   async remove(id: string, hostId: string): Promise<void> {
@@ -237,100 +244,99 @@ export class ActivitiesService {
     });
   }
 
-  async incrementParticipants(id: string): Promise<ActivityResponseDto> {
-    // Use atomic update with capacity check to prevent race conditions
-    // First, verify activity exists
-    const activity = await this.prisma.activity.findUnique({
-      where: { id },
-    });
+  private async mapToResponseDto(activity: any, viewerId?: string): Promise<ActivityResponseDto> {
+    const [confirmedCount, waitlistCount, viewerProfile] = await Promise.all([
+      this.prisma.activityParticipant.count({
+        where: { activity_id: activity.id, status: 'confirmed' },
+      }),
+      this.prisma.activityParticipant.count({
+        where: { activity_id: activity.id, status: 'waitlisted' },
+      }),
+      viewerId
+        ? this.prisma.user_profiles.findUnique({
+            where: { user_id: viewerId },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
 
-    if (!activity) {
-      throw new NotFoundException(`Activity with ID ${id} not found`);
+    let viewerParticipation: any | null = null;
+    if (viewerProfile) {
+      viewerParticipation = await this.prisma.activityParticipant.findUnique({
+        where: {
+          activity_id_profile_id: {
+            activity_id: activity.id,
+            profile_id: viewerProfile.id,
+          },
+        },
+      });
     }
 
-    // Use raw SQL for atomic conditional update to prevent race conditions
-    // This ensures only one concurrent request can increment when under capacity
-    const updateResult = await this.prisma.$executeRaw`
-      UPDATE activities
-      SET current_participants = current_participants + 1,
-          updated_at = NOW()
-      WHERE id = ${id}::uuid
-        AND current_participants < max_participants
-    `;
+    const viewerMeta = this.formatViewerParticipation(viewerParticipation);
+    const canSeeLocation =
+      (viewerId && activity.host_id === viewerId) ||
+      (viewerParticipation && viewerParticipation.status === 'confirmed');
 
-    // If no rows were updated, the activity is at capacity
-    if (updateResult === 0) {
-      throw new BadRequestException('Activity is already at full capacity');
-    }
-
-    // Fetch the updated activity
-    const updated = await this.prisma.activity.findUnique({
-      where: { id },
-    });
-
-    if (!updated) {
-      throw new NotFoundException(`Activity with ID ${id} not found after update`);
-    }
-
-    return this.mapToResponseDto(updated);
-  }
-
-  async decrementParticipants(id: string): Promise<ActivityResponseDto> {
-    // Use atomic update to prevent race conditions
-    // First, verify activity exists
-    const activity = await this.prisma.activity.findUnique({
-      where: { id },
-    });
-
-    if (!activity) {
-      throw new NotFoundException(`Activity with ID ${id} not found`);
-    }
-
-    // Use raw SQL for atomic conditional update to prevent race conditions
-    // This ensures only one concurrent request can decrement when above zero
-    const updateResult = await this.prisma.$executeRaw`
-      UPDATE activities
-      SET current_participants = current_participants - 1,
-          updated_at = NOW()
-      WHERE id = ${id}::uuid
-        AND current_participants > 0
-    `;
-
-    // If no rows were updated, the activity already has zero participants
-    if (updateResult === 0) {
-      throw new BadRequestException('Activity already has zero participants');
-    }
-
-    // Fetch the updated activity
-    const updated = await this.prisma.activity.findUnique({
-      where: { id },
-    });
-
-    if (!updated) {
-      throw new NotFoundException(`Activity with ID ${id} not found after update`);
-    }
-
-    return this.mapToResponseDto(updated);
-  }
-
-  private mapToResponseDto(activity: any): ActivityResponseDto {
-    return {
+    const response: ActivityResponseDto = {
       id: activity.id,
       hostId: activity.host_id,
       title: activity.title,
       description: activity.description,
       category: activity.category,
       interests: activity.interests as string[],
-      location: activity.location as { latitude: number; longitude: number; address?: string },
+      location: this.prepareLocationForViewer(activity.location, Boolean(canSeeLocation)),
       activityDate: activity.activity_date.toISOString().split('T')[0],
       startTime: this.convertDateToTimeString(activity.start_time),
       endTime: activity.end_time ? this.convertDateToTimeString(activity.end_time) : null,
       maxParticipants: activity.max_participants,
-      currentParticipants: activity.current_participants,
+      currentParticipants: confirmedCount,
+      waitlistCount,
       status: activity.status,
       isPublic: activity.is_public,
       createdAt: activity.created_at,
       updatedAt: activity.updated_at,
+      meetingPointHidden: !canSeeLocation,
+    };
+
+    if (viewerMeta) {
+      response.viewerParticipation = viewerMeta;
+    }
+
+    return response;
+  }
+
+  private prepareLocationForViewer(
+    rawLocation: any,
+    revealExactLocation: boolean,
+  ): { latitude: number; longitude: number; address?: string } {
+    if (!rawLocation) {
+      return { latitude: 0, longitude: 0 };
+    }
+
+    const location = rawLocation as { latitude: number; longitude: number; address?: string };
+    if (revealExactLocation || !location.address) {
+      return location;
+    }
+
+    const { address, ...rest } = location;
+    return rest;
+  }
+
+  private formatViewerParticipation(participation: any | null): ViewerParticipationMeta | undefined {
+    if (!participation) {
+      return undefined;
+    }
+
+    if (participation.status === 'cancelled') {
+      return undefined;
+    }
+
+    return {
+      participantId: participation.id,
+      status: participation.status as ParticipationState,
+      waitlistPosition: participation.waitlist_position ?? null,
+      joinedAt: participation.joined_at ?? null,
+      approvedAt: participation.approved_at ?? null,
     };
   }
 
