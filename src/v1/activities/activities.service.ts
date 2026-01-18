@@ -6,10 +6,14 @@ import { ActivityResponseDto, ViewerParticipationMeta, ParticipationState } from
 import { Prisma } from 'src/generated/prisma/client';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
 import { assertHostCapacity, assertVerifiedHost, FREE_MAX_HOSTS_PER_MONTH, isPremium } from './hosting-rules';
+import { ActivityMessagesService } from './messages/activity-messages.service';
 
 @Injectable()
 export class ActivitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly messagesService: ActivityMessagesService,
+  ) {}
 
   async create(user: AuthenticatedUser, dto: CreateActivityDto): Promise<ActivityResponseDto> {
     assertVerifiedHost(user);
@@ -281,6 +285,24 @@ export class ActivitiesService {
       }
     }
 
+    const changeNotes: string[] = [];
+    if (dto.activityDate && activityDate.toISOString().split('T')[0] !== existing.activity_date.toISOString().split('T')[0]) {
+      changeNotes.push('date updated');
+    }
+    if (dto.startTime && this.convertDateToTimeString(startTime) !== this.convertDateToTimeString(existing.start_time)) {
+      changeNotes.push('start time updated');
+    }
+    if (dto.endTime) {
+      const existingEnd = existing.end_time ? this.convertDateToTimeString(existing.end_time) : null;
+      const nextEnd = endTime ? this.convertDateToTimeString(endTime) : null;
+      if (existingEnd !== nextEnd) {
+        changeNotes.push('end time updated');
+      }
+    }
+    if (dto.location && JSON.stringify(dto.location) !== JSON.stringify(existing.location)) {
+      changeNotes.push('location updated');
+    }
+
     // Build update data
     const updateData: Prisma.ActivityUpdateInput = {};
     if (dto.title !== undefined) updateData.title = dto.title;
@@ -348,6 +370,14 @@ export class ActivitiesService {
       where: { id },
       data: updateData,
     });
+
+    if (changeNotes.length > 0) {
+      await this.messagesService.createSystemMessage(
+        activity.id,
+        `Activity details updated: ${changeNotes.join(', ')}.`,
+        { changes: changeNotes },
+      );
+    }
 
     return this.mapToResponseDto(activity, user.supabaseUserId);
   }
