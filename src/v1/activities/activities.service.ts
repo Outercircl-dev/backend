@@ -45,24 +45,22 @@ export class ActivitiesService {
     const activityDate = new Date(dto.activityDate);
 
     // Validate end time is after start time (including seconds)
-    if (dto.endTime) {
-      const startTimeParts = dto.startTime.split(':');
-      const endTimeParts = dto.endTime.split(':');
-      const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
-                          parseInt(startTimeParts[1]) * 60 + 
-                          (parseInt(startTimeParts[2] || '0'));
-      const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
-                        parseInt(endTimeParts[1]) * 60 + 
-                        (parseInt(endTimeParts[2] || '0'));
-      if (endSeconds <= startSeconds) {
-        throw new BadRequestException('End time must be after start time');
-      }
+    const startTimeParts = dto.startTime.split(':');
+    const endTimeParts = dto.endTime.split(':');
+    const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
+                        parseInt(startTimeParts[1]) * 60 + 
+                        (parseInt(startTimeParts[2] || '0'));
+    const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
+                      parseInt(endTimeParts[1]) * 60 + 
+                      (parseInt(endTimeParts[2] || '0'));
+    if (endSeconds <= startSeconds) {
+      throw new BadRequestException('End time must be after start time');
     }
 
     // Convert time strings to Date objects for Prisma Time fields
     // Prisma Time fields expect Date objects with time components set
     const startTimeDate = this.convertTimeStringToDate(dto.startTime);
-    const endTimeDate = dto.endTime ? this.convertTimeStringToDate(dto.endTime) : null;
+    const endTimeDate = this.convertTimeStringToDate(dto.endTime);
 
     if (!isPremium(user)) {
       const { start, end } = this.getMonthRange(new Date());
@@ -128,7 +126,7 @@ export class ActivitiesService {
         host_id: user.supabaseUserId,
         title: dto.title,
         description: dto.description || null,
-        category: dto.category || null,
+        category: dto.category,
         interests: dto.interests,
         location: dto.location as any, // Cast to any for Prisma JSON type
         activity_date: activityDate,
@@ -250,39 +248,24 @@ export class ActivitiesService {
       }
     }
 
-    // Parse activity date if provided (DTO already validates format via @IsDateString)
-    let activityDate = existing.activity_date;
-    if (dto.activityDate) {
-      activityDate = new Date(dto.activityDate);
-    }
+    // Parse activity date (DTO already validates format via @IsDateString)
+    const activityDate = new Date(dto.activityDate);
 
-    // Handle times if provided
-    let startTime = existing.start_time;
-    let endTime = existing.end_time;
-    
-    // Convert existing time (Date) to string for comparison
-    const existingStartTimeStr = this.convertDateToTimeString(existing.start_time);
-    
-    if (dto.startTime) {
-      startTime = this.convertTimeStringToDate(dto.startTime);
-    }
+    // Handle times
+    const startTime = this.convertTimeStringToDate(dto.startTime);
+    const endTime = this.convertTimeStringToDate(dto.endTime);
 
-    if (dto.endTime) {
-      endTime = this.convertTimeStringToDate(dto.endTime);
-
-      // Validate end time is after start time (including seconds)
-      const startTimeStr = dto.startTime || existingStartTimeStr;
-      const startTimeParts = startTimeStr.split(':');
-      const endTimeParts = dto.endTime.split(':');
-      const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
-                          parseInt(startTimeParts[1]) * 60 + 
-                          (parseInt(startTimeParts[2] || '0'));
-      const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
-                        parseInt(endTimeParts[1]) * 60 + 
-                        (parseInt(endTimeParts[2] || '0'));
-      if (endSeconds <= startSeconds) {
-        throw new BadRequestException('End time must be after start time');
-      }
+    // Validate end time is after start time (including seconds)
+    const startTimeParts = dto.startTime.split(':');
+    const endTimeParts = dto.endTime.split(':');
+    const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
+                        parseInt(startTimeParts[1]) * 60 + 
+                        (parseInt(startTimeParts[2] || '0'));
+    const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
+                      parseInt(endTimeParts[1]) * 60 + 
+                      (parseInt(endTimeParts[2] || '0'));
+    if (endSeconds <= startSeconds) {
+      throw new BadRequestException('End time must be after start time');
     }
 
     const changeNotes: string[] = [];
@@ -304,19 +287,18 @@ export class ActivitiesService {
     }
 
     // Build update data
-    const updateData: Prisma.ActivityUpdateInput = {};
-    if (dto.title !== undefined) updateData.title = dto.title;
-    if (dto.description !== undefined) updateData.description = dto.description || null;
-    if (dto.category !== undefined) updateData.category = dto.category || null;
-    if (dto.interests !== undefined) updateData.interests = dto.interests;
-    if (dto.location !== undefined) updateData.location = dto.location as any; // Cast to any for Prisma JSON type
-    if (dto.activityDate !== undefined) updateData.activity_date = activityDate;
-    if (dto.startTime !== undefined) updateData.start_time = startTime;
-    if (dto.endTime !== undefined) updateData.end_time = endTime || null;
-    if (dto.maxParticipants !== undefined) {
-      assertHostCapacity(user, dto.maxParticipants);
-      updateData.max_participants = dto.maxParticipants;
-    }
+    const updateData: Prisma.ActivityUpdateInput = {
+      title: dto.title,
+      description: dto.description || null,
+      category: dto.category,
+      interests: dto.interests,
+      location: dto.location as any, // Cast to any for Prisma JSON type
+      activity_date: activityDate,
+      start_time: startTime,
+      end_time: endTime,
+    };
+    assertHostCapacity(user, dto.maxParticipants);
+    updateData.max_participants = dto.maxParticipants;
     if (dto.isPublic !== undefined) updateData.is_public = dto.isPublic;
     if (dto.groupId !== undefined) {
       if (dto.groupId === null) {
