@@ -265,6 +265,19 @@ describe('ActivitiesService', () => {
     const hostUser = { supabaseUserId: hostId, role: 'authenticated', type: 'FREEMIUM' as const };
     const updateDto: UpdateActivityDto = {
       title: 'Updated Title',
+      description: 'Updated Description',
+      category: 'Sports',
+      interests: ['basketball'],
+      location: {
+        latitude: 37.7749,
+        longitude: -122.4194,
+        address: 'San Francisco, CA',
+      },
+      activityDate: '2099-12-31',
+      startTime: '10:00',
+      endTime: '12:00',
+      maxParticipants: 4,
+      isPublic: true,
     };
 
     it('should update activity when user is host', async () => {
@@ -291,6 +304,7 @@ describe('ActivitiesService', () => {
 
       const updatedActivity = { ...existingActivity, title: 'Updated Title' };
 
+      mockPrismaService.interest.findMany.mockResolvedValue([{ slug: 'basketball' }]);
       mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
       mockPrismaService.activity.update.mockResolvedValue(updatedActivity);
 
