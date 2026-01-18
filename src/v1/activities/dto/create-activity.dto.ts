@@ -12,9 +12,9 @@ class LocationDto {
   @Max(180)
   longitude: number;
 
-  @IsOptional()
   @IsString()
-  address?: string;
+  @IsNotEmpty()
+  address: string;
 }
 
 class RecurrenceDto {
@@ -46,9 +46,9 @@ export class CreateActivityDto {
   @IsString()
   description?: string;
 
-  @IsOptional()
   @IsString()
-  category?: string;
+  @IsNotEmpty()
+  category: string;
 
   @IsArray()
   @IsString({ each: true })
@@ -71,12 +71,12 @@ export class CreateActivityDto {
   })
   startTime: string; // Format: "HH:mm:ss" or "HH:mm"
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @Matches(/^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/, {
     message: 'endTime must be in HH:mm or HH:mm:ss format',
   })
-  endTime?: string; // Format: "HH:mm:ss" or "HH:mm"
+  endTime: string; // Format: "HH:mm:ss" or "HH:mm"
 
   @IsInt()
   @Min(1)
