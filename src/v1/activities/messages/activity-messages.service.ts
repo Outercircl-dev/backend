@@ -30,8 +30,9 @@ export class ActivityMessagesService {
     page = 1,
     limit = 50,
   ): Promise<{ items: ActivityMessageSummary[]; total: number; page: number; limit: number; totalPages: number }> {
-    const profile = await this.getProfileForUser(user.supabaseUserId);
-    await this.assertCanAccessActivity(activityId, user.supabaseUserId, profile.id);
+    const supabaseUserId = this.requireSupabaseUserId(user);
+    const profile = await this.getProfileForUser(supabaseUserId);
+    await this.assertCanAccessActivity(activityId, supabaseUserId, profile.id);
 
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
@@ -57,9 +58,10 @@ export class ActivityMessagesService {
   }
 
   async createMessage(activityId: string, user: AuthenticatedUser, dto: CreateActivityMessageDto) {
-    const profile = await this.getProfileForUser(user.supabaseUserId);
-    const activity = await this.assertCanAccessActivity(activityId, user.supabaseUserId, profile.id);
-    const isHost = activity.host_id === user.supabaseUserId;
+    const supabaseUserId = this.requireSupabaseUserId(user);
+    const profile = await this.getProfileForUser(supabaseUserId);
+    const activity = await this.assertCanAccessActivity(activityId, supabaseUserId, profile.id);
+    const isHost = activity.host_id === supabaseUserId;
 
     const wantsAnnouncement = dto.messageType === 'announcement' || Boolean(dto.isPinned);
     if (wantsAnnouncement && !isHost) {
@@ -97,9 +99,10 @@ export class ActivityMessagesService {
     user: AuthenticatedUser,
     dto: PinActivityMessageDto,
   ) {
-    const profile = await this.getProfileForUser(user.supabaseUserId);
-    const activity = await this.assertCanAccessActivity(activityId, user.supabaseUserId, profile.id);
-    const isHost = activity.host_id === user.supabaseUserId;
+    const supabaseUserId = this.requireSupabaseUserId(user);
+    const profile = await this.getProfileForUser(supabaseUserId);
+    const activity = await this.assertCanAccessActivity(activityId, supabaseUserId, profile.id);
+    const isHost = activity.host_id === supabaseUserId;
 
     if (!isHost) {
       throw new ForbiddenException('Only the host can pin announcements');
@@ -142,8 +145,9 @@ export class ActivityMessagesService {
     user: AuthenticatedUser,
     dto: ReportActivityMessageDto,
   ) {
-    const profile = await this.getProfileForUser(user.supabaseUserId);
-    await this.assertCanAccessActivity(activityId, user.supabaseUserId, profile.id);
+    const supabaseUserId = this.requireSupabaseUserId(user);
+    const profile = await this.getProfileForUser(supabaseUserId);
+    await this.assertCanAccessActivity(activityId, supabaseUserId, profile.id);
 
     const message = await this.prisma.activityMessage.findUnique({
       where: { id: messageId },
@@ -183,7 +187,7 @@ export class ActivityMessagesService {
         author_profile_id: null,
         content,
         message_type: messageType,
-        metadata: metadata ?? {},
+        metadata: (metadata ?? {}) as Prisma.InputJsonValue,
       },
       include: {
         author: { select: { id: true, full_name: true, profile_picture_url: true } },
@@ -193,10 +197,7 @@ export class ActivityMessagesService {
     return this.mapMessage(message);
   }
 
-  private async getProfileForUser(supabaseUserId?: string) {
-    if (!supabaseUserId) {
-      throw new BadRequestException('supabaseUserId missing from authenticated request');
-    }
+  private async getProfileForUser(supabaseUserId: string) {
     const profile = await this.prisma.user_profiles.findUnique({
       where: { user_id: supabaseUserId },
       select: { id: true },
@@ -235,6 +236,13 @@ export class ActivityMessagesService {
     }
 
     return activity;
+  }
+
+  private requireSupabaseUserId(user: AuthenticatedUser): string {
+    if (!user?.supabaseUserId) {
+      throw new BadRequestException('supabaseUserId missing from authenticated request');
+    }
+    return user.supabaseUserId;
   }
 
   private mapMessage(

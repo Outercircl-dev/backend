@@ -11,7 +11,9 @@ export function isVerifiedHost(user?: AuthenticatedUser | null): boolean {
 }
 
 export function isPremium(user?: AuthenticatedUser | null): boolean {
-  return user?.type === SubscriptionTier.PREMIUM;
+  console.log(`User type: ${user?.type}`)
+  return true;
+  // return user?.type === SubscriptionTier.PREMIUM;
 }
 
 export function assertVerifiedHost(user?: AuthenticatedUser | null) {

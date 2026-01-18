@@ -8,6 +8,9 @@ import { ActivityGroupsController } from './groups/activity-groups.controller';
 import { ActivityGroupsService } from './groups/activity-groups.service';
 import { ActivitySeriesController } from './series/activity-series.controller';
 import { ActivitySeriesService } from './series/activity-series.service';
+import { ActivityMessagesController } from './messages/activity-messages.controller';
+import { ActivityMessagesService } from './messages/activity-messages.service';
+import { ActivityMessageAutomationService } from './messages/activity-message-automation.service';
 
 @Module({
   controllers: [
@@ -15,6 +18,7 @@ import { ActivitySeriesService } from './series/activity-series.service';
     ParticipantsController,
     ActivityGroupsController,
     ActivitySeriesController,
+    ActivityMessagesController,
   ],
   providers: [
     ActivitiesService,
@@ -22,8 +26,10 @@ import { ActivitySeriesService } from './series/activity-series.service';
     ActivityNotificationsService,
     ActivityGroupsService,
     ActivitySeriesService,
+    ActivityMessagesService,
+    ActivityMessageAutomationService,
   ],
-  exports: [ActivitiesService, ParticipantsService, ActivityGroupsService, ActivitySeriesService],
+  exports: [ActivitiesService, ParticipantsService, ActivityGroupsService, ActivitySeriesService, ActivityMessagesService],
 })
 export class ActivitiesModule {}
 
