@@ -14,11 +14,9 @@ import configuration from './config/configuration';
 import { validate } from './config/validation';
 import { ProfileModule } from './v1/profile/profile.module';
 import { ActivitiesModule } from './v1/activities/activities.module';
-import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
-    ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
     FeedModule,

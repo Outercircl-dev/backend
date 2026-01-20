@@ -45,22 +45,24 @@ export class ActivitiesService {
     const activityDate = new Date(dto.activityDate);
 
     // Validate end time is after start time (including seconds)
-    const startTimeParts = dto.startTime.split(':');
-    const endTimeParts = dto.endTime.split(':');
-    const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
-                        parseInt(startTimeParts[1]) * 60 + 
-                        (parseInt(startTimeParts[2] || '0'));
-    const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
-                      parseInt(endTimeParts[1]) * 60 + 
-                      (parseInt(endTimeParts[2] || '0'));
-    if (endSeconds <= startSeconds) {
-      throw new BadRequestException('End time must be after start time');
+    if (dto.endTime) {
+      const startTimeParts = dto.startTime.split(':');
+      const endTimeParts = dto.endTime.split(':');
+      const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
+                          parseInt(startTimeParts[1]) * 60 + 
+                          (parseInt(startTimeParts[2] || '0'));
+      const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
+                        parseInt(endTimeParts[1]) * 60 + 
+                        (parseInt(endTimeParts[2] || '0'));
+      if (endSeconds <= startSeconds) {
+        throw new BadRequestException('End time must be after start time');
+      }
     }
 
     // Convert time strings to Date objects for Prisma Time fields
     // Prisma Time fields expect Date objects with time components set
     const startTimeDate = this.convertTimeStringToDate(dto.startTime);
-    const endTimeDate = this.convertTimeStringToDate(dto.endTime);
+    const endTimeDate = dto.endTime ? this.convertTimeStringToDate(dto.endTime) : null;
 
     if (!isPremium(user)) {
       const { start, end } = this.getMonthRange(new Date());
@@ -253,19 +255,21 @@ export class ActivitiesService {
 
     // Handle times
     const startTime = this.convertTimeStringToDate(dto.startTime);
-    const endTime = this.convertTimeStringToDate(dto.endTime);
+    const endTime = dto.endTime ? this.convertTimeStringToDate(dto.endTime) : existing.end_time;
 
     // Validate end time is after start time (including seconds)
-    const startTimeParts = dto.startTime.split(':');
-    const endTimeParts = dto.endTime.split(':');
-    const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
-                        parseInt(startTimeParts[1]) * 60 + 
-                        (parseInt(startTimeParts[2] || '0'));
-    const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
-                      parseInt(endTimeParts[1]) * 60 + 
-                      (parseInt(endTimeParts[2] || '0'));
-    if (endSeconds <= startSeconds) {
-      throw new BadRequestException('End time must be after start time');
+    if (dto.endTime) {
+      const startTimeParts = dto.startTime.split(':');
+      const endTimeParts = dto.endTime.split(':');
+      const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
+                          parseInt(startTimeParts[1]) * 60 + 
+                          (parseInt(startTimeParts[2] || '0'));
+      const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
+                        parseInt(endTimeParts[1]) * 60 + 
+                        (parseInt(endTimeParts[2] || '0'));
+      if (endSeconds <= startSeconds) {
+        throw new BadRequestException('End time must be after start time');
+      }
     }
 
     const changeNotes: string[] = [];
