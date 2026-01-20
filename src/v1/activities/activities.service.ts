@@ -6,10 +6,14 @@ import { ActivityResponseDto, ViewerParticipationMeta, ParticipationState } from
 import { Prisma } from 'src/generated/prisma/client';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
 import { assertHostCapacity, assertVerifiedHost, FREE_MAX_HOSTS_PER_MONTH, isPremium } from './hosting-rules';
+import { ActivityMessagesService } from './messages/activity-messages.service';
 
 @Injectable()
 export class ActivitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly messagesService: ActivityMessagesService,
+  ) {}
 
   async create(user: AuthenticatedUser, dto: CreateActivityDto): Promise<ActivityResponseDto> {
     assertVerifiedHost(user);
@@ -249,19 +253,39 @@ export class ActivitiesService {
 
     // Handle times
     const startTime = this.convertTimeStringToDate(dto.startTime);
-    const endTime = this.convertTimeStringToDate(dto.endTime);
+    const endTime = dto.endTime ? this.convertTimeStringToDate(dto.endTime) : existing.end_time;
 
     // Validate end time is after start time (including seconds)
-    const startTimeParts = dto.startTime.split(':');
-    const endTimeParts = dto.endTime.split(':');
-    const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
-                        parseInt(startTimeParts[1]) * 60 + 
-                        (parseInt(startTimeParts[2] || '0'));
-    const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
-                      parseInt(endTimeParts[1]) * 60 + 
-                      (parseInt(endTimeParts[2] || '0'));
-    if (endSeconds <= startSeconds) {
-      throw new BadRequestException('End time must be after start time');
+    if (dto.endTime) {
+      const startTimeParts = dto.startTime.split(':');
+      const endTimeParts = dto.endTime.split(':');
+      const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
+                          parseInt(startTimeParts[1]) * 60 + 
+                          (parseInt(startTimeParts[2] || '0'));
+      const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
+                        parseInt(endTimeParts[1]) * 60 + 
+                        (parseInt(endTimeParts[2] || '0'));
+      if (endSeconds <= startSeconds) {
+        throw new BadRequestException('End time must be after start time');
+      }
+    }
+
+    const changeNotes: string[] = [];
+    if (dto.activityDate && activityDate.toISOString().split('T')[0] !== existing.activity_date.toISOString().split('T')[0]) {
+      changeNotes.push('date updated');
+    }
+    if (dto.startTime && this.convertDateToTimeString(startTime) !== this.convertDateToTimeString(existing.start_time)) {
+      changeNotes.push('start time updated');
+    }
+    if (dto.endTime) {
+      const existingEnd = existing.end_time ? this.convertDateToTimeString(existing.end_time) : null;
+      const nextEnd = endTime ? this.convertDateToTimeString(endTime) : null;
+      if (existingEnd !== nextEnd) {
+        changeNotes.push('end time updated');
+      }
+    }
+    if (dto.location && JSON.stringify(dto.location) !== JSON.stringify(existing.location)) {
+      changeNotes.push('location updated');
     }
 
     // Build update data
@@ -330,6 +354,14 @@ export class ActivitiesService {
       where: { id },
       data: updateData,
     });
+
+    if (changeNotes.length > 0) {
+      await this.messagesService.createSystemMessage(
+        activity.id,
+        `Activity details updated: ${changeNotes.join(', ')}.`,
+        { changes: changeNotes },
+      );
+    }
 
     return this.mapToResponseDto(activity, user.supabaseUserId);
   }

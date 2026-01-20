@@ -22,7 +22,7 @@ export interface ActivityMessageSummary {
 
 @Injectable()
 export class ActivityMessagesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async listMessages(
     activityId: string,

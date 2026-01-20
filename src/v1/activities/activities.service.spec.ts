@@ -4,10 +4,12 @@ import { ActivitiesService } from './activities.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
+import { ActivityMessagesService } from './messages/activity-messages.service';
 
 describe('ActivitiesService', () => {
   let service: ActivitiesService;
   let prismaService: PrismaService;
+  let messagesService: { createSystemMessage: jest.Mock };
 
   const mockPrismaService = {
     activity: {
@@ -39,6 +41,9 @@ describe('ActivitiesService', () => {
       findUnique: jest.fn(),
     },
   };
+  const mockMessagesService = {
+    createSystemMessage: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -48,11 +53,16 @@ describe('ActivitiesService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: ActivityMessagesService,
+          useValue: mockMessagesService,
+        },
       ],
     }).compile();
 
     service = module.get<ActivitiesService>(ActivitiesService);
     prismaService = module.get<PrismaService>(PrismaService);
+    messagesService = module.get(ActivityMessagesService);
 
     jest.clearAllMocks();
     mockPrismaService.activityParticipant.count.mockResolvedValue(0);
@@ -61,6 +71,8 @@ describe('ActivitiesService', () => {
     mockPrismaService.activityGroupMember.findUnique.mockResolvedValue(null);
     mockPrismaService.activitySeries.findUnique.mockResolvedValue(null);
     mockPrismaService.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1' });
+    mockPrismaService.activity.count.mockResolvedValue(0);
+    mockMessagesService.createSystemMessage.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -105,7 +117,7 @@ describe('ActivitiesService', () => {
         end_time: createDto.endTime,
         max_participants: createDto.maxParticipants,
         current_participants: 0,
-        status: 'draft',
+        status: 'published',
         is_public: createDto.isPublic,
         group_id: null,
         series_id: null,
@@ -124,7 +136,7 @@ describe('ActivitiesService', () => {
       });
       expect(mockPrismaService.activity.create).toHaveBeenCalled();
       expect(result.id).toBe('activity-123');
-      expect(result.status).toBe('draft');
+      expect(result.status).toBe('published');
     });
 
     it('should throw BadRequestException for invalid interests', async () => {

@@ -31,5 +31,5 @@ import { ActivityMessageAutomationService } from './messages/activity-message-au
   ],
   exports: [ActivitiesService, ParticipantsService, ActivityGroupsService, ActivitySeriesService, ActivityMessagesService],
 })
-export class ActivitiesModule {}
+export class ActivitiesModule { }
 

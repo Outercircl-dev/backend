@@ -27,6 +27,7 @@ import { ActivitiesModule } from './v1/activities/activities.module';
       load: [configuration],
       validate: validate
     }),
+    ScheduleModule.forRoot(),
     MeModule,
     InterestsModule,
     PrismaModule,
