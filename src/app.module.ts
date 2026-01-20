@@ -17,6 +17,7 @@ import { ActivitiesModule } from './v1/activities/activities.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     AuthModule,
     UsersModule,
     FeedModule,
