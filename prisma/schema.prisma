@@ -55,6 +55,9 @@ model user_profiles {
   activitySeries          ActivitySeries[]
   activityMessages        ActivityMessage[]     @relation("activity_message_author")
   activityMessageReports  ActivityMessageReport[]
+  activityFeedbacks       ActivityFeedback[]            @relation("activity_feedback_author")
+  activityRatingsGiven    ActivityParticipantRating[]    @relation("activity_rating_reviewer")
+  activityRatingsReceived ActivityParticipantRating[]    @relation("activity_rating_target")
 
   @@index([created_at(sort: Desc)], map: "idx_user_profiles_created_at")
   @@index([interests], map: "idx_user_profiles_interests", type: Gin)
@@ -364,6 +367,8 @@ model Activity {
   participants ActivityParticipant[]
   invites      ActivityInvite[]
   messages     ActivityMessage[]
+  feedbacks    ActivityFeedback[]
+  ratings      ActivityParticipantRating[]
   group        ActivityGroup?        @relation(fields: [group_id], references: [id])
   series       ActivitySeries?       @relation(fields: [series_id], references: [id])
 
@@ -519,5 +524,49 @@ model ActivityMessageReport {
   @@unique([message_id, reporter_profile_id], map: "uq_activity_message_reporter")
   @@index([message_id], map: "idx_activity_message_reports_message_id")
   @@map("activity_message_reports")
+  @@schema("public")
+}
+
+model ActivityFeedback {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activity_id          String    @db.Uuid
+  author_profile_id    String    @db.Uuid
+  rating               Int
+  comment              String?
+  consent_to_analysis  Boolean   @default(false)
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime? @updatedAt @db.Timestamptz(6)
+
+  activity Activity       @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  author   user_profiles  @relation("activity_feedback_author", fields: [author_profile_id], references: [id], onDelete: Cascade)
+  ratings  ActivityParticipantRating[]
+
+  @@unique([activity_id, author_profile_id], map: "uq_activity_feedback_author")
+  @@index([activity_id], map: "idx_activity_feedback_activity_id")
+  @@index([author_profile_id], map: "idx_activity_feedback_author")
+  @@map("activity_feedback")
+  @@schema("public")
+}
+
+model ActivityParticipantRating {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activity_id          String    @db.Uuid
+  feedback_id          String    @db.Uuid
+  reviewer_profile_id  String    @db.Uuid
+  target_profile_id    String    @db.Uuid
+  rating               Int
+  comment              String?
+  flagged_for_review   Boolean   @default(false)
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+
+  activity Activity        @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  feedback ActivityFeedback @relation(fields: [feedback_id], references: [id], onDelete: Cascade)
+  reviewer user_profiles   @relation("activity_rating_reviewer", fields: [reviewer_profile_id], references: [id], onDelete: Cascade)
+  target   user_profiles   @relation("activity_rating_target", fields: [target_profile_id], references: [id], onDelete: Cascade)
+
+  @@unique([activity_id, reviewer_profile_id, target_profile_id], map: "uq_activity_participant_rating")
+  @@index([activity_id], map: "idx_activity_participant_ratings_activity")
+  @@index([target_profile_id], map: "idx_activity_participant_ratings_target")
+  @@map("activity_participant_ratings")
   @@schema("public")
 }

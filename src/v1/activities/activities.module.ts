@@ -11,6 +11,8 @@ import { ActivitySeriesService } from './series/activity-series.service';
 import { ActivityMessagesController } from './messages/activity-messages.controller';
 import { ActivityMessagesService } from './messages/activity-messages.service';
 import { ActivityMessageAutomationService } from './messages/activity-message-automation.service';
+import { ActivityFeedbackController } from './feedback/activity-feedback.controller';
+import { ActivityFeedbackService } from './feedback/activity-feedback.service';
 
 @Module({
   controllers: [
@@ -19,6 +21,7 @@ import { ActivityMessageAutomationService } from './messages/activity-message-au
     ActivityGroupsController,
     ActivitySeriesController,
     ActivityMessagesController,
+    ActivityFeedbackController,
   ],
   providers: [
     ActivitiesService,
@@ -28,6 +31,7 @@ import { ActivityMessageAutomationService } from './messages/activity-message-au
     ActivitySeriesService,
     ActivityMessagesService,
     ActivityMessageAutomationService,
+    ActivityFeedbackService,
   ],
   exports: [ActivitiesService, ParticipantsService, ActivityGroupsService, ActivitySeriesService, ActivityMessagesService],
 })

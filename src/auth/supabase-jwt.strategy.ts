@@ -2,6 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { verifySupabaseJwt } from "./supabase-jwks";
 import { Strategy } from "passport-custom";
+import { SubscriptionTier } from "src/common/enums/subscription-tier.enum";
 
 export interface SupabaseJwtPayload {
     sub: string
@@ -40,6 +41,7 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
                 supabaseUserId: payload.sub,
                 email: payload.email,
                 role: payload.role,
+                type: this.extractSubscriptionTier(payload),
                 raw: payload,
             };
         } catch (err) {
@@ -63,6 +65,8 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
         if (input.iat) sanitized.iat = input.iat;
         if (input.exp) sanitized.exp = input.exp;
         if (input.role) sanitized.role = input.role;
+        if (input.app_metadata?.subscription_tier) sanitized.subscription_tier = input.app_metadata.subscription_tier;
+        if (input.user_metadata?.subscription_tier) sanitized.subscription_tier = input.user_metadata.subscription_tier;
 
         return sanitized;
     }
@@ -71,5 +75,30 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
         if (!value) return '';
         if (value.length <= 6) return `${value[0]}***${value[value.length - 1]}`;
         return `${value.slice(0, 3)}***${value.slice(-3)}`;
+    }
+
+    private extractSubscriptionTier(payload: SupabaseJwtPayload | Record<string, any> | unknown): SubscriptionTier | undefined {
+        if (!payload || typeof payload !== 'object') {
+            return undefined;
+        }
+
+        const rawPayload = payload as Record<string, any>;
+        const rawTier =
+            rawPayload?.app_metadata?.subscription_tier ??
+            rawPayload?.user_metadata?.subscription_tier ??
+            rawPayload?.subscription_tier;
+
+        if (!rawTier || typeof rawTier !== 'string') {
+            return undefined;
+        }
+
+        const normalized = rawTier.toUpperCase();
+        if (normalized === SubscriptionTier.PREMIUM) {
+            return SubscriptionTier.PREMIUM;
+        }
+        if (normalized === SubscriptionTier.FREEMIUM) {
+            return SubscriptionTier.FREEMIUM;
+        }
+        return undefined;
     }
 }
