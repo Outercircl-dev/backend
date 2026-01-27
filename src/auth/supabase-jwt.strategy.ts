@@ -66,7 +66,6 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
         if (input.exp) sanitized.exp = input.exp;
         if (input.role) sanitized.role = input.role;
         if (input.app_metadata?.subscription_tier) sanitized.subscription_tier = input.app_metadata.subscription_tier;
-        if (input.user_metadata?.subscription_tier) sanitized.subscription_tier = input.user_metadata.subscription_tier;
 
         return sanitized;
     }
@@ -85,7 +84,6 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
         const rawPayload = payload as Record<string, any>;
         const rawTier =
             rawPayload?.app_metadata?.subscription_tier ??
-            rawPayload?.user_metadata?.subscription_tier ??
             rawPayload?.subscription_tier;
 
         if (!rawTier || typeof rawTier !== 'string') {

@@ -174,37 +174,37 @@ export class ActivityFeedbackService {
         new Set(participantRatings.filter((item) => item.rating <= LOW_RATING_THRESHOLD).map((item) => item.profileId)),
       );
 
-      const lowRatingCounts = lowRatingTargets.length
-        ? await tx.activityParticipantRating.groupBy({
-            by: ['target_profile_id'],
-            where: {
-              target_profile_id: { in: lowRatingTargets },
-              rating: { lte: LOW_RATING_THRESHOLD },
-            },
-            _count: { _all: true },
-          })
-        : [];
-
-      const lowRatingCountMap = new Map(
-        lowRatingCounts.map((entry) => [entry.target_profile_id, entry._count._all]),
-      );
-
-      const createRows = participantRatings.map((item) => {
-        const existingLowCount = lowRatingCountMap.get(item.profileId) ?? 0;
-        const shouldFlag =
-          item.rating <= LOW_RATING_THRESHOLD && existingLowCount + 1 >= LOW_RATING_REVIEW_COUNT;
-        return {
-          activity_id: activityId,
-          feedback_id: createdFeedback.id,
-          reviewer_profile_id: profile.id,
-          target_profile_id: item.profileId,
-          rating: item.rating,
-          comment: item.comment,
-          flagged_for_review: shouldFlag,
-        };
-      });
+      const createRows = participantRatings.map((item) => ({
+        activity_id: activityId,
+        feedback_id: createdFeedback.id,
+        reviewer_profile_id: profile.id,
+        target_profile_id: item.profileId,
+        rating: item.rating,
+        comment: item.comment,
+        flagged_for_review: false,
+      }));
 
       await tx.activityParticipantRating.createMany({ data: createRows });
+
+      for (const targetProfileId of lowRatingTargets) {
+        const lowRatingCount = await tx.activityParticipantRating.count({
+          where: {
+            target_profile_id: targetProfileId,
+            rating: { lte: LOW_RATING_THRESHOLD },
+          },
+        });
+
+        if (lowRatingCount >= LOW_RATING_REVIEW_COUNT) {
+          await tx.activityParticipantRating.updateMany({
+            where: {
+              feedback_id: createdFeedback.id,
+              target_profile_id: targetProfileId,
+              rating: { lte: LOW_RATING_THRESHOLD },
+            },
+            data: { flagged_for_review: true },
+          });
+        }
+      }
 
       return [createdFeedback, createRows] as const;
     });
@@ -264,6 +264,7 @@ export class ActivityFeedbackService {
         activity_date: true,
         start_time: true,
         end_time: true,
+        timezone_name: true,
       },
     });
 
@@ -371,23 +372,110 @@ export class ActivityFeedbackService {
     return trimmed ? trimmed : null;
   }
 
-  private isActivityEnded(activity: { status: string; activity_date: Date; start_time: Date; end_time: Date | null }) {
+  private isActivityEnded(activity: {
+    status: string;
+    activity_date: Date;
+    start_time: Date;
+    end_time: Date | null;
+    timezone_name?: string | null;
+  }) {
     if (activity.status === 'completed') {
       return true;
     }
-    const endDateTime = this.buildActivityDateTime(activity.activity_date, activity.end_time ?? activity.start_time);
-    return new Date() >= endDateTime;
+    const endDateTime = this.buildActivityDateTime(
+      activity.activity_date,
+      activity.end_time ?? activity.start_time,
+      activity.timezone_name ?? undefined,
+    );
+    return Date.now() >= endDateTime.getTime();
   }
 
-  private buildActivityDateTime(activityDate: Date, time: Date | string): Date {
-    const date = new Date(activityDate);
-    if (typeof time === 'string') {
-      const [hours, minutes, seconds = '0'] = time.split(':');
-      date.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
-      return date;
+  private buildActivityDateTime(activityDate: Date, time: Date | string, timezoneName?: string): Date {
+    const { hours, minutes, seconds } = this.parseActivityTime(time);
+    const year = activityDate.getUTCFullYear();
+    const month = activityDate.getUTCMonth();
+    const day = activityDate.getUTCDate();
+    const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds, 0));
+
+    if (!timezoneName) {
+      return utcDate;
     }
-    date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), 0);
-    return date;
+
+    return this.applyTimeZoneOffset(utcDate, timezoneName);
+  }
+
+  private parseActivityTime(time: Date | string): { hours: number; minutes: number; seconds: number } {
+    if (typeof time !== 'string') {
+      if (Number.isNaN(time.getTime())) {
+        this.logger.warn('Invalid time value received for activity time; defaulting to 00:00:00');
+        return { hours: 0, minutes: 0, seconds: 0 };
+      }
+      return {
+        hours: time.getHours(),
+        minutes: time.getMinutes(),
+        seconds: time.getSeconds(),
+      };
+    }
+
+    const trimmed = time.trim();
+    const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+    if (!match) {
+      this.logger.warn(`Invalid time string "${time}" for activity time; defaulting to 00:00:00`);
+      return { hours: 0, minutes: 0, seconds: 0 };
+    }
+
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const seconds = Number(match[3] ?? '0');
+
+    if (
+      Number.isNaN(hours) ||
+      Number.isNaN(minutes) ||
+      Number.isNaN(seconds) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59 ||
+      seconds < 0 ||
+      seconds > 59
+    ) {
+      this.logger.warn(`Out-of-range time string "${time}" for activity time; defaulting to 00:00:00`);
+      return { hours: 0, minutes: 0, seconds: 0 };
+    }
+
+    return { hours, minutes, seconds };
+  }
+
+  private applyTimeZoneOffset(utcDate: Date, timezoneName: string): Date {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezoneName,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+
+      const parts = formatter.formatToParts(utcDate);
+      const lookup = (type: string) => parts.find((part) => part.type === type)?.value ?? '0';
+      const zonedYear = Number(lookup('year'));
+      const zonedMonth = Number(lookup('month')) - 1;
+      const zonedDay = Number(lookup('day'));
+      const zonedHour = Number(lookup('hour'));
+      const zonedMinute = Number(lookup('minute'));
+      const zonedSecond = Number(lookup('second'));
+
+      const zonedAsUtc = Date.UTC(zonedYear, zonedMonth, zonedDay, zonedHour, zonedMinute, zonedSecond);
+      const offsetMs = zonedAsUtc - utcDate.getTime();
+
+      return new Date(utcDate.getTime() - offsetMs);
+    } catch (error) {
+      this.logger.warn(`Failed to apply timezone ${timezoneName}; falling back to UTC time`, error as Error);
+      return utcDate;
+    }
   }
 
   private async computeUserRatingSummary(profileId: string): Promise<UserRatingSummary> {

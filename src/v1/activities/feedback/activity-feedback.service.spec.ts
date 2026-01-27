@@ -22,8 +22,9 @@ describe('ActivityFeedbackService', () => {
         create: jest.fn(),
       },
       activityParticipantRating: {
-        groupBy: jest.fn(),
+        count: jest.fn(),
         createMany: jest.fn(),
+        updateMany: jest.fn(),
         findMany: jest.fn(),
       },
       user_profiles: {
@@ -102,8 +103,9 @@ describe('ActivityFeedbackService', () => {
         }),
       },
       activityParticipantRating: {
-        groupBy: jest.fn().mockResolvedValue([{ target_profile_id: 'profile-2', _count: { _all: 2 } }]),
+        count: jest.fn().mockResolvedValue(3),
         createMany: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     prisma.$transaction.mockImplementation((cb: any) => cb(tx));
@@ -123,9 +125,17 @@ describe('ActivityFeedbackService', () => {
       data: [
         expect.objectContaining({
           target_profile_id: 'profile-2',
-          flagged_for_review: true,
+          flagged_for_review: false,
         }),
       ],
+    });
+    expect(tx.activityParticipantRating.updateMany).toHaveBeenCalledWith({
+      where: {
+        feedback_id: 'feedback-1',
+        target_profile_id: 'profile-2',
+        rating: { lte: 2 },
+      },
+      data: { flagged_for_review: true },
     });
   });
 
