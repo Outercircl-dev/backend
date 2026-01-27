@@ -355,6 +355,7 @@ model Activity {
   activity_date        DateTime        @db.Date
   start_time           DateTime        @db.Time(6)
   end_time             DateTime?       @db.Time(6)
+  timezone_name        String?         @db.VarChar(100)
   max_participants     Int
   current_participants Int             @default(0)
   status               activity_status @default(draft)
