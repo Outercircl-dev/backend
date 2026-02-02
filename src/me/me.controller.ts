@@ -9,10 +9,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SupabaseAuthGuard } from 'src/auth/supabase-auth.guard';
-import { SubscriptionTier } from 'src/common/enums/subscription-tier.enum';
+import type { MembershipTierKey, MembershipTierRules } from 'src/config/membership-tiers.model';
+import { MembershipTiersService } from 'src/config/membership-tiers.service';
 import { UsersService } from 'src/users/users.service';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request.interface';
 import { ProfileService } from 'src/v1/profile/profile.service';
+import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
 
 interface BackendMeResponse {
   id: string;
@@ -20,7 +22,8 @@ interface BackendMeResponse {
   email: string;
   hasOnboarded: boolean;
   role: string;
-  type: SubscriptionTier;
+  type: MembershipTierKey;
+  tierRules: MembershipTierRules;
 }
 
 interface UpdateMeRequest {
@@ -34,6 +37,8 @@ export class MeController {
   constructor(
     private readonly usersService: UsersService,
     private readonly profileService: ProfileService,
+    private readonly membershipTiersService: MembershipTiersService,
+    private readonly membershipSubscriptionsService: MembershipSubscriptionsService,
   ) { }
 
   @UseGuards(SupabaseAuthGuard)
@@ -51,13 +56,17 @@ export class MeController {
 
     const profile = await this.profileService.getProfile(user.supabaseUserId);
 
+    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    const tierRules = this.membershipTiersService.getTierRules(tierKey);
+
     return {
       id: user.supabaseUserId,
       supabaseUserId: user.supabaseUserId,
       email: user.email,
       hasOnboarded: Boolean(profile),
       role: user.role,
-      type: user.type ?? SubscriptionTier.FREEMIUM,
+      type: tierKey,
+      tierRules,
     };
   }
 
@@ -86,8 +95,11 @@ export class MeController {
       body.hasOnboarded,
       user.email,
       user.role,
-      user.type ?? SubscriptionTier.FREEMIUM,
+      user.type ?? this.membershipTiersService.getDefaultTier(),
     );
+
+    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(updatedUser.supabaseId);
+    const tierRules = this.membershipTiersService.getTierRules(tierKey);
 
     return {
       id: updatedUser.supabaseId,
@@ -95,7 +107,8 @@ export class MeController {
       email: updatedUser.email,
       hasOnboarded: updatedUser.hasOnboarded,
       role: updatedUser.role,
-      type: updatedUser.type ?? SubscriptionTier.FREEMIUM,
+      type: tierKey,
+      tierRules,
     };
   }
 }

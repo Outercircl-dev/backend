@@ -1,4 +1,4 @@
-import { SubscriptionTier } from "src/common/enums/subscription-tier.enum"
+import type { MembershipTierKey } from "src/config/membership-tiers.model"
 
 export class User {
     id: string             // internal backend ID
@@ -6,5 +6,5 @@ export class User {
     email: string
     hasOnboarded: boolean
     role: string
-    type: SubscriptionTier
+    type: MembershipTierKey
 }

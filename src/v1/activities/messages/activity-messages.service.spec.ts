@@ -80,7 +80,7 @@ describe('ActivityMessagesService', () => {
 
     const result = await service.createMessage(
       'activity-1',
-      { supabaseUserId: 'user-1', type: 'PREMIUM', isVerified: true } as any,
+      { supabaseUserId: 'user-1', type: 'PREMIUM', tierClass: 'premium', isVerified: true } as any,
       { content: 'Hello', messageType: 'announcement', isPinned: true },
     );
 

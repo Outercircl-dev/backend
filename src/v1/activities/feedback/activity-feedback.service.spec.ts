@@ -1,12 +1,15 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { SubscriptionTier } from 'src/common/enums/subscription-tier.enum';
 import { ActivityFeedbackService } from './activity-feedback.service';
+import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
+import { MembershipTiersService } from 'src/config/membership-tiers.service';
 
 describe('ActivityFeedbackService', () => {
   let service: ActivityFeedbackService;
   let prisma: any;
+  let membershipSubscriptionsService: { resolveTierForUserId: jest.Mock };
+  let membershipTiersService: { getTierClass: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -32,6 +35,14 @@ describe('ActivityFeedbackService', () => {
       },
       $transaction: jest.fn(),
     };
+    membershipSubscriptionsService = {
+      resolveTierForUserId: jest.fn().mockResolvedValue('FREEMIUM'),
+    };
+    membershipTiersService = {
+      getTierClass: jest.fn().mockImplementation((tier) =>
+        tier === 'PREMIUM' ? 'premium' : 'freemium',
+      ),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +50,14 @@ describe('ActivityFeedbackService', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: MembershipSubscriptionsService,
+          useValue: membershipSubscriptionsService,
+        },
+        {
+          provide: MembershipTiersService,
+          useValue: membershipTiersService,
         },
       ],
     }).compile();
@@ -51,6 +70,7 @@ describe('ActivityFeedbackService', () => {
   });
 
   it('rejects feedback submission before activity ends', async () => {
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('FREEMIUM');
     prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1', user_id: 'user-1' });
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
@@ -65,13 +85,14 @@ describe('ActivityFeedbackService', () => {
     await expect(
       service.submitFeedback(
         'activity-1',
-        { supabaseUserId: 'user-1', type: SubscriptionTier.FREEMIUM } as any,
+        { supabaseUserId: 'user-1', type: 'FREEMIUM', tierClass: 'freemium' } as any,
         { rating: 4, consentToAnalysis: true },
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('flags low ratings after repeated misconduct', async () => {
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('PREMIUM');
     prisma.user_profiles.findUnique.mockImplementation(({ where }: any) => {
       if (where.user_id === 'user-1') {
         return { id: 'profile-1', user_id: 'user-1' };
@@ -112,7 +133,7 @@ describe('ActivityFeedbackService', () => {
 
     await service.submitFeedback(
       'activity-1',
-      { supabaseUserId: 'user-1', type: SubscriptionTier.PREMIUM } as any,
+      { supabaseUserId: 'user-1', type: 'PREMIUM', tierClass: 'premium' } as any,
       {
         rating: 3,
         comment: null,
@@ -140,15 +161,19 @@ describe('ActivityFeedbackService', () => {
   });
 
   it('blocks non-premium users from viewing rating summaries', async () => {
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('FREEMIUM');
     await expect(
       service.getUserRatingSummary('activity-1', 'profile-2', {
         supabaseUserId: 'user-1',
-        type: SubscriptionTier.FREEMIUM,
+        type: 'FREEMIUM',
+        tierClass: 'freemium',
+        tierClass: 'freemium',
       } as any),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('requires consent to submit feedback', async () => {
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('PREMIUM');
     prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1', user_id: 'user-1' });
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
@@ -163,7 +188,7 @@ describe('ActivityFeedbackService', () => {
     await expect(
       service.submitFeedback(
         'activity-1',
-        { supabaseUserId: 'user-1', type: SubscriptionTier.PREMIUM } as any,
+        { supabaseUserId: 'user-1', type: 'PREMIUM', tierClass: 'premium' } as any,
         { rating: 4, consentToAnalysis: false },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);

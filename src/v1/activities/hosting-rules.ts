@@ -1,17 +1,9 @@
 import { ForbiddenException } from '@nestjs/common';
-import { SubscriptionTier } from 'src/common/enums/subscription-tier.enum';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
-
-export const FREE_MAX_PARTICIPANTS = 4;
-export const FREE_MAX_HOSTS_PER_MONTH = 2;
-export const GROUP_MAX_MEMBERS = 15;
+import type { MembershipTierRules } from 'src/config/membership-tiers.model';
 
 export function isVerifiedHost(user?: AuthenticatedUser | null): boolean {
   return Boolean(user && user.role === 'authenticated');
-}
-
-export function isPremium(user?: AuthenticatedUser | null): boolean {
-  return user?.type === SubscriptionTier.PREMIUM;
 }
 
 export function assertVerifiedHost(user?: AuthenticatedUser | null) {
@@ -20,13 +12,40 @@ export function assertVerifiedHost(user?: AuthenticatedUser | null) {
   }
 }
 
-export function assertHostCapacity(user: AuthenticatedUser | null | undefined, requested: number) {
-  if (isPremium(user)) {
+export function assertHostCapacity(tierRules: MembershipTierRules, requested: number) {
+  const maxAllowed = tierRules.hosting.maxParticipantsPerActivity;
+  if (maxAllowed === null) {
     return;
   }
+  const enforceExact = tierRules.hosting.enforceExactMaxParticipants;
+  if (enforceExact && requested !== maxAllowed) {
+    throw new ForbiddenException(`Free tier hosts must set max participants to ${maxAllowed}`);
+  }
+  if (!enforceExact && requested > maxAllowed) {
+    throw new ForbiddenException(`Max participants cannot exceed ${maxAllowed} for your tier`);
+  }
+}
 
-  if (requested !== FREE_MAX_PARTICIPANTS) {
-    throw new ForbiddenException(`Free tier hosts must set max participants to ${FREE_MAX_PARTICIPANTS}`);
+export function assertHostMonthlyLimit(tierRules: MembershipTierRules, hostedCount: number) {
+  const maxHosts = tierRules.hosting.maxHostsPerMonth;
+  if (maxHosts === null) {
+    return;
+  }
+  if (hostedCount >= maxHosts) {
+    throw new ForbiddenException(`Free tier hosts may only create ${maxHosts} activities per month`);
+  }
+}
+
+export function assertGroupsEnabled(tierRules: MembershipTierRules) {
+  if (!tierRules.groups.enabled) {
+    throw new ForbiddenException('Only premium hosts can use groups');
+  }
+}
+
+export function assertGroupSize(tierRules: MembershipTierRules, requested: number) {
+  const maxMembers = tierRules.groups.maxMembers;
+  if (requested > maxMembers) {
+    throw new ForbiddenException(`Group size cannot exceed ${maxMembers}`);
   }
 }
 

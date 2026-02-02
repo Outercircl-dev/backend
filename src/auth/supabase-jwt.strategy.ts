@@ -2,7 +2,8 @@ import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { verifySupabaseJwt } from "./supabase-jwks";
 import { Strategy } from "passport-custom";
-import { SubscriptionTier } from "src/common/enums/subscription-tier.enum";
+import { MembershipTiersService } from "src/config/membership-tiers.service";
+import type { MembershipTierKey } from "src/config/membership-tiers.model";
 
 export interface SupabaseJwtPayload {
     sub: string
@@ -14,6 +15,10 @@ export interface SupabaseJwtPayload {
 @Injectable()
 export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jwt') {
     private readonly logger = new Logger(SupabaseJwtStrategy.name, { timestamp: true });
+
+    constructor(private readonly membershipTiersService: MembershipTiersService) {
+        super();
+    }
 
     async validate(req: Request): Promise<any> {
         this.logger.debug('Initiating JWT Validation using Supabase JWKS Strategy');
@@ -37,11 +42,15 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
                 throw new UnauthorizedException("Missing sub in JWT");
             }
 
+            const tierKey = this.extractSubscriptionTier(payload);
+            const tierClass = this.membershipTiersService.getTierClass(tierKey);
+
             return {
                 supabaseUserId: payload.sub,
                 email: payload.email,
                 role: payload.role,
-                type: this.extractSubscriptionTier(payload),
+                type: tierKey,
+                tierClass,
                 raw: payload,
             };
         } catch (err) {
@@ -76,7 +85,7 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
         return `${value.slice(0, 3)}***${value.slice(-3)}`;
     }
 
-    private extractSubscriptionTier(payload: SupabaseJwtPayload | Record<string, any> | unknown): SubscriptionTier | undefined {
+    private extractSubscriptionTier(payload: SupabaseJwtPayload | Record<string, any> | unknown): MembershipTierKey | undefined {
         if (!payload || typeof payload !== 'object') {
             return undefined;
         }
@@ -86,17 +95,6 @@ export class SupabaseJwtStrategy extends PassportStrategy(Strategy, 'supabase-jw
             rawPayload?.app_metadata?.subscription_tier ??
             rawPayload?.subscription_tier;
 
-        if (!rawTier || typeof rawTier !== 'string') {
-            return undefined;
-        }
-
-        const normalized = rawTier.toUpperCase();
-        if (normalized === SubscriptionTier.PREMIUM) {
-            return SubscriptionTier.PREMIUM;
-        }
-        if (normalized === SubscriptionTier.FREEMIUM) {
-            return SubscriptionTier.FREEMIUM;
-        }
-        return undefined;
+        return this.membershipTiersService.resolveTierKey(rawTier);
     }
 }

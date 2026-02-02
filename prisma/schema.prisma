@@ -325,6 +325,18 @@ enum invite_status {
   @@schema("public")
 }
 
+enum subscription_status {
+  active
+  trialing
+  past_due
+  canceled
+  incomplete
+  incomplete_expired
+  unpaid
+
+  @@schema("public")
+}
+
 enum recurrence_frequency {
   daily
   weekly
@@ -383,6 +395,26 @@ model Activity {
   @@index([group_id], map: "idx_activities_group_id")
   @@index([series_id], map: "idx_activities_series_id")
   @@map("activities")
+  @@schema("public")
+}
+
+model MembershipSubscription {
+  id                     String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                String              @unique @db.Uuid
+  tier                   String              @db.VarChar(20)
+  status                 subscription_status @default(active)
+  stripe_customer_id     String?             @unique @db.VarChar(120)
+  stripe_subscription_id String?             @unique @db.VarChar(120)
+  stripe_price_id        String?             @db.VarChar(120)
+  current_period_start   DateTime?           @db.Timestamptz(6)
+  current_period_end     DateTime?           @db.Timestamptz(6)
+  cancel_at_period_end   Boolean             @default(false)
+  created_at             DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?           @updatedAt @db.Timestamptz(6)
+
+  @@index([user_id], map: "idx_membership_subscriptions_user_id")
+  @@index([status], map: "idx_membership_subscriptions_status")
+  @@map("membership_subscriptions")
   @@schema("public")
 }
 
