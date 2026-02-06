@@ -5,11 +5,15 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { ActivityMessagesService } from './messages/activity-messages.service';
+import { MembershipTiersService } from 'src/config/membership-tiers.service';
+import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
 
 describe('ActivitiesService', () => {
   let service: ActivitiesService;
   let prismaService: PrismaService;
   let messagesService: { createSystemMessage: jest.Mock };
+  let membershipTiersService: { getTierRules: jest.Mock };
+  let membershipSubscriptionsService: { resolveTierForUserId: jest.Mock };
 
   const mockPrismaService = {
     activity: {
@@ -44,6 +48,12 @@ describe('ActivitiesService', () => {
   const mockMessagesService = {
     createSystemMessage: jest.fn(),
   };
+  const mockMembershipTiersService = {
+    getTierRules: jest.fn(),
+  };
+  const mockMembershipSubscriptionsService = {
+    resolveTierForUserId: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -57,14 +67,46 @@ describe('ActivitiesService', () => {
           provide: ActivityMessagesService,
           useValue: mockMessagesService,
         },
+        {
+          provide: MembershipTiersService,
+          useValue: mockMembershipTiersService,
+        },
+        {
+          provide: MembershipSubscriptionsService,
+          useValue: mockMembershipSubscriptionsService,
+        },
       ],
     }).compile();
 
     service = module.get<ActivitiesService>(ActivitiesService);
     prismaService = module.get<PrismaService>(PrismaService);
     messagesService = module.get(ActivityMessagesService);
+    membershipTiersService = module.get(MembershipTiersService);
+    membershipSubscriptionsService = module.get(MembershipSubscriptionsService);
 
     jest.clearAllMocks();
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('FREEMIUM');
+    membershipTiersService.getTierRules.mockReturnValue({
+      hosting: {
+        maxParticipantsPerActivity: 4,
+        maxHostsPerMonth: 2,
+        enforceExactMaxParticipants: true,
+      },
+      groups: {
+        enabled: false,
+        maxMembers: 15,
+      },
+      ads: {
+        showsAds: true,
+      },
+      verification: {
+        requiresVerifiedHostForHosting: true,
+      },
+      messaging: {
+        groupChatEnabled: true,
+        automatedMessagesEnabled: true,
+      },
+    });
     mockPrismaService.activityParticipant.count.mockResolvedValue(0);
     mockPrismaService.activityParticipant.findUnique.mockResolvedValue(null);
     mockPrismaService.activityGroup.findUnique.mockResolvedValue(null);
@@ -81,7 +123,12 @@ describe('ActivitiesService', () => {
 
   describe('create', () => {
     const hostId = 'host-123';
-    const hostUser = { supabaseUserId: hostId, role: 'authenticated', type: 'FREEMIUM' as const };
+    const hostUser = {
+      supabaseUserId: hostId,
+      role: 'authenticated',
+      type: 'FREEMIUM' as const,
+      tierClass: 'freemium',
+    };
     const createDto: CreateActivityDto = {
       title: 'Test Activity',
       description: 'Test Description',
@@ -147,7 +194,12 @@ describe('ActivitiesService', () => {
     });
 
     it('should reject non-verified hosts', async () => {
-      const unverifiedUser = { supabaseUserId: hostId, role: 'anonymous', type: 'FREEMIUM' as const };
+      const unverifiedUser = {
+        supabaseUserId: hostId,
+        role: 'anonymous',
+        type: 'FREEMIUM' as const,
+        tierClass: 'freemium',
+      };
       await expect(service.create(unverifiedUser, createDto)).rejects.toThrow(ForbiddenException);
     });
 
@@ -274,7 +326,12 @@ describe('ActivitiesService', () => {
   describe('update', () => {
     const activityId = 'activity-123';
     const hostId = 'host-123';
-    const hostUser = { supabaseUserId: hostId, role: 'authenticated', type: 'FREEMIUM' as const };
+    const hostUser = {
+      supabaseUserId: hostId,
+      role: 'authenticated',
+      type: 'FREEMIUM' as const,
+      tierClass: 'freemium',
+    };
     const updateDto: UpdateActivityDto = {
       title: 'Updated Title',
       description: 'Updated Description',
@@ -368,7 +425,12 @@ describe('ActivitiesService', () => {
   describe('remove', () => {
     const activityId = 'activity-123';
     const hostId = 'host-123';
-    const hostUser = { supabaseUserId: hostId, role: 'authenticated', type: 'FREEMIUM' as const };
+    const hostUser = {
+      supabaseUserId: hostId,
+      role: 'authenticated',
+      type: 'FREEMIUM' as const,
+      tierClass: 'freemium',
+    };
 
     it('should delete activity when user is host', async () => {
       const existingActivity = {

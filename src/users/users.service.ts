@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { SupabaseJwtPayload } from '../auth/supabase-jwt.strategy';
 import { User } from './user.entity';
-import { SubscriptionTier } from 'src/common/enums/subscription-tier.enum';
+import type { MembershipTierKey } from 'src/config/membership-tiers.model';
+import { MembershipTiersService } from 'src/config/membership-tiers.service';
 
 @Injectable()
 export class UsersService {
   // In-memory store just for example; replace with DB.
   private users: User[] = [];
+
+  constructor(private readonly membershipTiersService: MembershipTiersService) {}
 
   async findBySupabaseId(supabaseId: string): Promise<User | undefined> {
     return this.users.find((u) => u.supabaseId === supabaseId);
@@ -20,7 +23,7 @@ export class UsersService {
       email: payload.email ?? '',
       hasOnboarded: false,
       role: payload.role ?? 'not-authenticated',
-      type: SubscriptionTier.FREEMIUM,
+      type: this.membershipTiersService.getDefaultTier(),
     };
 
     this.users.push(user);
@@ -57,7 +60,7 @@ export class UsersService {
     hasOnboarded: boolean,
     email?: string,
     role?: string,
-    type?: SubscriptionTier,
+    type?: MembershipTierKey,
   ): Promise<User> {
     let user = await this.findBySupabaseId(supabaseId);
 
@@ -68,7 +71,7 @@ export class UsersService {
         email: email ?? '',
         hasOnboarded,
         role: role ?? 'not-authenticated',
-        type: type ?? SubscriptionTier.FREEMIUM,
+        type: type ?? this.membershipTiersService.getDefaultTier(),
       };
       this.users.push(user);
       return user;
@@ -85,7 +88,7 @@ export class UsersService {
       user.type = type;
     }
     if (!user.type) {
-      user.type = SubscriptionTier.FREEMIUM;
+      user.type = this.membershipTiersService.getDefaultTier();
     }
 
     return user;

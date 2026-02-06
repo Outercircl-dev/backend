@@ -1,4 +1,4 @@
-import { SubscriptionTier } from "../enums/subscription-tier.enum";
+import type { MembershipTierKey } from "../../config/membership-tiers.model";
 
 export interface AuthenticatedUser {
     id?: string;
@@ -6,6 +6,7 @@ export interface AuthenticatedUser {
     email?: string;
     hasOnboarded?: boolean;
     role?: string;
-    type?: SubscriptionTier;
+    type?: MembershipTierKey;
+    tierClass?: string;
 }
 

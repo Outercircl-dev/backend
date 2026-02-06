@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { isPremium } from '../hosting-rules';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
 import { CreateActivityFeedbackDto } from './dto/create-activity-feedback.dto';
+import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
+import { MembershipTiersService } from 'src/config/membership-tiers.service';
 
 export interface FeedbackParticipantSummary {
   profileId: string;
@@ -47,7 +48,11 @@ const LOW_RATING_REVIEW_COUNT = 3;
 export class ActivityFeedbackService {
   private readonly logger = new Logger(ActivityFeedbackService.name, { timestamp: true });
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly membershipSubscriptionsService: MembershipSubscriptionsService,
+    private readonly membershipTiersService: MembershipTiersService,
+  ) {}
 
   async getFeedbackForm(activityId: string, user: AuthenticatedUser): Promise<FeedbackFormResponse> {
     const profile = await this.getProfileOrThrow(user.supabaseUserId);
@@ -79,8 +84,9 @@ export class ActivityFeedbackService {
       },
     });
 
+    const includeRatingSummary = await this.isPremiumMember(user);
     const participants = isHost || hasConfirmedParticipation
-      ? await this.getParticipantsForRating(activity, profile.id, isPremium(user))
+      ? await this.getParticipantsForRating(activity, profile.id, includeRatingSummary)
       : [];
 
     return {
@@ -226,7 +232,7 @@ export class ActivityFeedbackService {
     profileId: string,
     viewer: AuthenticatedUser,
   ): Promise<UserRatingSummary> {
-    if (!isPremium(viewer)) {
+    if (!(await this.isPremiumMember(viewer))) {
       throw new ForbiddenException('Only premium members can view user ratings');
     }
 
@@ -327,6 +333,14 @@ export class ActivityFeedbackService {
     );
 
     return summariesWithRatings;
+  }
+
+  private async isPremiumMember(user: AuthenticatedUser): Promise<boolean> {
+    if (!user.supabaseUserId) {
+      return false;
+    }
+    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    return this.membershipTiersService.getTierClass(tierKey)?.toLowerCase() === 'premium';
   }
 
   private async getValidRatingTargets(activity: { id: string; host_id: string }, viewerProfileId: string) {

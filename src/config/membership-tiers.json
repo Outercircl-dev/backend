@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-01-29",
+  "defaultTier": "FREEMIUM",
+  "tiers": {
+    "FREEMIUM": {
+      "metadata": {
+        "tierClass": "freemium",
+        "displayName": "Freemium"
+      },
+      "hosting": {
+        "maxParticipantsPerActivity": 4,
+        "maxHostsPerMonth": 2,
+        "enforceExactMaxParticipants": true
+      },
+      "groups": {
+        "enabled": false,
+        "maxMembers": 15
+      },
+      "ads": {
+        "showsAds": true
+      },
+      "verification": {
+        "requiresVerifiedHostForHosting": true
+      },
+      "messaging": {
+        "groupChatEnabled": true,
+        "automatedMessagesEnabled": true
+      }
+    },
+    "PREMIUM": {
+      "metadata": {
+        "tierClass": "premium",
+        "displayName": "Premium"
+      },
+      "hosting": {
+        "maxParticipantsPerActivity": null,
+        "maxHostsPerMonth": null,
+        "enforceExactMaxParticipants": false
+      },
+      "groups": {
+        "enabled": true,
+        "maxMembers": 15,
+        "notes": "No tier difference defined yet."
+      },
+      "ads": {
+        "showsAds": false
+      },
+      "verification": {
+        "requiresVerifiedHostForHosting": true
+      },
+      "messaging": {
+        "groupChatEnabled": true,
+        "automatedMessagesEnabled": true,
+        "notes": "No tier difference defined yet."
+      }
+    }
+  },
+  "logic": {
+    "differences": [
+      "Freemium hosts must set max participants to 4; premium has no enforced cap.",
+      "Freemium hosts are limited to 2 hosted activities per month; premium has no monthly cap.",
+      "Freemium users see ads; premium users do not."
+    ]
+  }
+}

@@ -5,14 +5,18 @@ import { UpdateActivityDto } from './dto/update-activity.dto';
 import { ActivityResponseDto, ViewerParticipationMeta, ParticipationState } from './dto/activity-response.dto';
 import { Prisma } from 'src/generated/prisma/client';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
-import { assertHostCapacity, assertVerifiedHost, FREE_MAX_HOSTS_PER_MONTH, isPremium } from './hosting-rules';
+import { assertGroupsEnabled, assertHostCapacity, assertHostMonthlyLimit, assertVerifiedHost } from './hosting-rules';
 import { ActivityMessagesService } from './messages/activity-messages.service';
+import { MembershipTiersService } from 'src/config/membership-tiers.service';
+import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
 
 @Injectable()
 export class ActivitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly messagesService: ActivityMessagesService,
+    private readonly membershipTiersService: MembershipTiersService,
+    private readonly membershipSubscriptionsService: MembershipSubscriptionsService,
   ) {}
 
   async create(user: AuthenticatedUser, dto: CreateActivityDto): Promise<ActivityResponseDto> {
@@ -21,7 +25,9 @@ export class ActivitiesService {
       throw new BadRequestException('supabaseUserId missing from authenticated request');
     }
 
-    assertHostCapacity(user, dto.maxParticipants);
+    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    const tierRules = this.membershipTiersService.getTierRules(tierKey);
+    assertHostCapacity(tierRules, dto.maxParticipants);
     // Validate interests exist in the interests table
     if (dto.interests && dto.interests.length > 0) {
       const existingInterests = await this.prisma.interest.findMany({
@@ -62,7 +68,7 @@ export class ActivitiesService {
     const startTimeDate = this.convertTimeStringToDate(dto.startTime);
     const endTimeDate = this.convertTimeStringToDate(dto.endTime);
 
-    if (!isPremium(user)) {
+    if (tierRules.hosting.maxHostsPerMonth !== null) {
       const { start, end } = this.getMonthRange(new Date());
       const hostedCount = await this.prisma.activity.count({
         where: {
@@ -73,18 +79,14 @@ export class ActivitiesService {
           },
         },
       });
-      if (hostedCount >= FREE_MAX_HOSTS_PER_MONTH) {
-        throw new ForbiddenException(`Free tier hosts may only create ${FREE_MAX_HOSTS_PER_MONTH} activities per month`);
-      }
+      assertHostMonthlyLimit(tierRules, hostedCount);
     }
 
     const profile = await this.getProfileForUser(user.supabaseUserId);
 
     let groupId: string | null = null;
     if (dto.groupId) {
-      if (!isPremium(user)) {
-        throw new ForbiddenException('Only premium hosts can use groups');
-      }
+      assertGroupsEnabled(tierRules);
       const group = await this.prisma.activityGroup.findUnique({
         where: { id: dto.groupId },
         select: { id: true, owner_profile_id: true },
@@ -299,16 +301,16 @@ export class ActivitiesService {
       start_time: startTime,
       end_time: endTime,
     };
-    assertHostCapacity(user, dto.maxParticipants);
+    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    const tierRules = this.membershipTiersService.getTierRules(tierKey);
+    assertHostCapacity(tierRules, dto.maxParticipants);
     updateData.max_participants = dto.maxParticipants;
     if (dto.isPublic !== undefined) updateData.is_public = dto.isPublic;
     if (dto.groupId !== undefined) {
       if (dto.groupId === null) {
         updateData.group = { disconnect: true };
       } else {
-        if (!isPremium(user)) {
-          throw new ForbiddenException('Only premium hosts can use groups');
-        }
+        assertGroupsEnabled(tierRules);
         const profile = await this.getProfileForUser(user.supabaseUserId);
         const group = await this.prisma.activityGroup.findUnique({
           where: { id: dto.groupId },

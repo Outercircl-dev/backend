@@ -1,27 +1,34 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
-import { assertVerifiedHost, GROUP_MAX_MEMBERS, isPremium } from '../hosting-rules';
+import { assertGroupSize, assertGroupsEnabled, assertVerifiedHost } from '../hosting-rules';
 import { CreateActivityGroupDto } from './dto/create-activity-group.dto';
 import { UpdateActivityGroupDto } from './dto/update-activity-group.dto';
+import { MembershipTiersService } from 'src/config/membership-tiers.service';
+import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
 
 @Injectable()
 export class ActivityGroupsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly membershipTiersService: MembershipTiersService,
+    private readonly membershipSubscriptionsService: MembershipSubscriptionsService,
+  ) {}
 
   async createGroup(user: AuthenticatedUser, dto: CreateActivityGroupDto) {
     assertVerifiedHost(user);
-    if (!isPremium(user)) {
-      throw new ForbiddenException('Only premium hosts can create groups');
-    }
     if (!user?.supabaseUserId) {
       throw new BadRequestException('supabaseUserId missing from authenticated request');
     }
 
+    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    const tierRules = this.membershipTiersService.getTierRules(tierKey);
+    assertGroupsEnabled(tierRules);
+
     const profile = await this.getProfileForUser(user.supabaseUserId);
 
-    if (dto.maxMembers && dto.maxMembers > GROUP_MAX_MEMBERS) {
-      throw new BadRequestException(`Group size cannot exceed ${GROUP_MAX_MEMBERS}`);
+    if (dto.maxMembers) {
+      assertGroupSize(tierRules, dto.maxMembers);
     }
 
     const group = await this.prisma.activityGroup.create({
@@ -30,7 +37,7 @@ export class ActivityGroupsService {
         name: dto.name,
         description: dto.description ?? null,
         is_public: dto.isPublic ?? false,
-        max_members: dto.maxMembers ?? GROUP_MAX_MEMBERS,
+        max_members: dto.maxMembers ?? tierRules.groups.maxMembers,
       },
     });
 
@@ -66,13 +73,13 @@ export class ActivityGroupsService {
 
   async updateGroup(id: string, user: AuthenticatedUser, dto: UpdateActivityGroupDto) {
     assertVerifiedHost(user);
-    if (!isPremium(user)) {
-      throw new ForbiddenException('Only premium hosts can manage groups');
-    }
     if (!user?.supabaseUserId) {
       throw new BadRequestException('supabaseUserId missing from authenticated request');
     }
 
+    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    const tierRules = this.membershipTiersService.getTierRules(tierKey);
+    assertGroupsEnabled(tierRules);
     const profile = await this.getProfileForUser(user.supabaseUserId);
     const group = await this.prisma.activityGroup.findUnique({
       where: { id },
@@ -86,8 +93,8 @@ export class ActivityGroupsService {
       throw new ForbiddenException('Only group owners can update group details');
     }
 
-    if (dto.maxMembers && dto.maxMembers > GROUP_MAX_MEMBERS) {
-      throw new BadRequestException(`Group size cannot exceed ${GROUP_MAX_MEMBERS}`);
+    if (dto.maxMembers) {
+      assertGroupSize(tierRules, dto.maxMembers);
     }
 
     return this.prisma.activityGroup.update({
