@@ -27,6 +27,9 @@ export function validate(config: Record<string, unknown>) {
     });
 
     if (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/dc96d955-be98-435e-8ebf-9e8110e8a442', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: 'pre-fix', hypothesisId: 'H3', location: 'src/config/validation.ts:31', message: 'Config validation error details', data: { messages: error.details?.map((d: Joi.ValidationErrorItem) => d.message) }, timestamp: Date.now() }) }).catch(() => { });
+        // #endregion agent log
         throw new Error(
             `Config validation error:\n${error.details
                 .map((d: Joi.ValidationErrorItem) => `- ${d.message}`)
