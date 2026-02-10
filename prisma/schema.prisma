@@ -418,6 +418,18 @@ model MembershipSubscription {
   @@schema("public")
 }
 
+model MembershipTiersConfig {
+  id                Int    @id @default(autoincrement())
+  version           String @db.VarChar(20)
+  last_updated      String @db.VarChar(20)
+  default_tier_key  String @db.VarChar(50)
+  tiers             Json
+  logic_differences Json
+
+  @@map("membership_tiers_config")
+  @@schema("public")
+}
+
 model ActivityGroup {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   owner_profile_id String    @db.Uuid
