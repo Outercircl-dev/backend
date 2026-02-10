@@ -36,6 +36,7 @@ $ pnpm install
 - Required: `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `SUPABASE_PROJECT_REF`, `SUPABASE_SECRET_KEY`.
 - Optional (defaults if unset): `NODE_ENV` (`production`), `JWT_EXPIRES_IN` (`15m`), `PORT` (`3000` locally).
 - Example file: copy `.env.example` to `.env` and fill the required secrets.
+- **Migrations**: Run the SQL files in `db/migrations/` against your Postgres database (e.g. in order 002–008). Membership tier definitions are loaded from the database at startup; `008_membership_tiers_config.sql` creates and seeds the config table. If that row is missing, the app will not start.
 - Docker image note: the `Dockerfile` sets `NODE_ENV=production` and `PORT=4000` (container listens on 4000). Supply the required variables at runtime (e.g., `docker run -e DATABASE_URL=... -e JWT_SECRET=...` or inject via your orchestrator’s env/secrets mechanism).
 
 ## Compile and run the project
