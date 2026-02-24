@@ -54,6 +54,13 @@ export class ProfileController {
         }
 
         const errors: ErrorDetail[] = [];
+        if (!body.username?.trim()) {
+            errors.push({
+                field: 'username',
+                code: 'required',
+                message: 'Username is required',
+            });
+        }
         if (!body.fullName?.trim()) {
             errors.push({
                 field: 'fullName',
@@ -164,6 +171,7 @@ export class ProfileController {
         }
 
         const updatableKeys: (keyof ProfileUpdateInput)[] = [
+            'username',
             'fullName',
             'gender',
             'profilePictureUrl',
