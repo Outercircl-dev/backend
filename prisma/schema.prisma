@@ -59,6 +59,9 @@ model user_profiles {
   activityFeedbacks       ActivityFeedback[]            @relation("activity_feedback_author")
   activityRatingsGiven    ActivityParticipantRating[]    @relation("activity_rating_reviewer")
   activityRatingsReceived ActivityParticipantRating[]    @relation("activity_rating_target")
+  notificationsReceived   Notification[]                 @relation("notification_recipient")
+  notificationsTriggered  Notification[]                 @relation("notification_actor")
+  notificationPreferences NotificationPreference?
 
   @@index([created_at(sort: Desc)], map: "idx_user_profiles_created_at")
   @@index([interests], map: "idx_user_profiles_interests", type: Gin)
@@ -339,6 +342,36 @@ enum subscription_status {
   @@schema("public")
 }
 
+enum notification_type {
+  recommendation_match
+  upcoming_activity
+  participant_joined
+  participant_cancelled
+  activity_time_changed
+  activity_location_changed
+  host_update
+  safety_alert
+
+  @@schema("public")
+}
+
+enum notification_channel {
+  in_app
+  email
+  browser
+
+  @@schema("public")
+}
+
+enum notification_delivery_status {
+  pending
+  sent
+  failed
+  skipped
+
+  @@schema("public")
+}
+
 enum recurrence_frequency {
   daily
   weekly
@@ -384,6 +417,7 @@ model Activity {
   messages     ActivityMessage[]
   feedbacks    ActivityFeedback[]
   ratings      ActivityParticipantRating[]
+  notifications Notification[]
   group        ActivityGroup?        @relation(fields: [group_id], references: [id])
   series       ActivitySeries?       @relation(fields: [series_id], references: [id])
 
@@ -615,5 +649,69 @@ model ActivityParticipantRating {
   @@index([activity_id], map: "idx_activity_participant_ratings_activity")
   @@index([target_profile_id], map: "idx_activity_participant_ratings_target")
   @@map("activity_participant_ratings")
+  @@schema("public")
+}
+
+model Notification {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipient_user_id String             @db.Uuid
+  actor_user_id     String?            @db.Uuid
+  activity_id       String?            @db.Uuid
+  type              notification_type
+  title             String             @db.VarChar(200)
+  body              String
+  payload           Json?              @default("{}")
+  deliver_in_app    Boolean            @default(true)
+  deliver_email     Boolean            @default(false)
+  deliver_browser   Boolean            @default(false)
+  is_read           Boolean            @default(false)
+  read_at           DateTime?          @db.Timestamptz(6)
+  created_at        DateTime?          @default(now()) @db.Timestamptz(6)
+
+  recipient  user_profiles             @relation("notification_recipient", fields: [recipient_user_id], references: [user_id], onDelete: Cascade)
+  actor      user_profiles?            @relation("notification_actor", fields: [actor_user_id], references: [user_id], onDelete: SetNull)
+  activity   Activity?                 @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  deliveries NotificationDelivery[]
+
+  @@index([recipient_user_id, is_read, created_at(sort: Desc)], map: "idx_notifications_recipient_unread")
+  @@index([activity_id], map: "idx_notifications_activity_id")
+  @@map("notifications")
+  @@schema("public")
+}
+
+model NotificationPreference {
+  user_id                     String    @id @db.Uuid
+  recommended_activities      Boolean   @default(true)
+  upcoming_activity_reminders Boolean   @default(true)
+  host_join_cancel_updates    Boolean   @default(true)
+  time_location_change_alerts Boolean   @default(true)
+  safety_alerts               Boolean   @default(true)
+  channel_in_app              Boolean   @default(true)
+  channel_email               Boolean   @default(true)
+  channel_browser             Boolean   @default(true)
+  created_at                  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime? @updatedAt @db.Timestamptz(6)
+
+  user user_profiles @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+  @@schema("public")
+}
+
+model NotificationDelivery {
+  id                  String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notification_id     String                       @db.Uuid
+  channel             notification_channel
+  status              notification_delivery_status @default(pending)
+  provider_message_id String?                      @db.VarChar(255)
+  error_message       String?
+  delivered_at        DateTime?                    @db.Timestamptz(6)
+  created_at          DateTime?                    @default(now()) @db.Timestamptz(6)
+
+  notification Notification @relation(fields: [notification_id], references: [id], onDelete: Cascade)
+
+  @@unique([notification_id, channel], map: "uq_notification_delivery_channel")
+  @@index([status, created_at(sort: Desc)], map: "idx_notification_deliveries_status")
+  @@map("notification_deliveries")
   @@schema("public")
 }

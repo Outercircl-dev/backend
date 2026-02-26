@@ -9,6 +9,7 @@ import { assertGroupsEnabled, assertHostCapacity, assertHostMonthlyLimit, assert
 import { ActivityMessagesService } from './messages/activity-messages.service';
 import { MembershipTiersService } from 'src/config/membership-tiers.service';
 import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ActivitiesService {
@@ -17,6 +18,7 @@ export class ActivitiesService {
     private readonly messagesService: ActivityMessagesService,
     private readonly membershipTiersService: MembershipTiersService,
     private readonly membershipSubscriptionsService: MembershipSubscriptionsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(user: AuthenticatedUser, dto: CreateActivityDto): Promise<ActivityResponseDto> {
@@ -273,21 +275,26 @@ export class ActivitiesService {
     }
 
     const changeNotes: string[] = [];
+    let hasTimeChange = false;
+    let hasLocationChange = false;
     if (dto.activityDate && activityDate.toISOString().split('T')[0] !== existing.activity_date.toISOString().split('T')[0]) {
       changeNotes.push('date updated');
     }
     if (dto.startTime && this.convertDateToTimeString(startTime) !== this.convertDateToTimeString(existing.start_time)) {
       changeNotes.push('start time updated');
+      hasTimeChange = true;
     }
     if (dto.endTime) {
       const existingEnd = existing.end_time ? this.convertDateToTimeString(existing.end_time) : null;
       const nextEnd = endTime ? this.convertDateToTimeString(endTime) : null;
       if (existingEnd !== nextEnd) {
         changeNotes.push('end time updated');
+        hasTimeChange = true;
       }
     }
     if (dto.location && JSON.stringify(dto.location) !== JSON.stringify(existing.location)) {
       changeNotes.push('location updated');
+      hasLocationChange = true;
     }
 
     // Build update data
@@ -363,6 +370,13 @@ export class ActivitiesService {
         `Activity details updated: ${changeNotes.join(', ')}.`,
         { changes: changeNotes },
       );
+    }
+
+    if (hasTimeChange || hasLocationChange) {
+      await this.notifyParticipantsOfScheduleChange(activity, user.supabaseUserId, {
+        hasTimeChange,
+        hasLocationChange,
+      });
     }
 
     return this.mapToResponseDto(activity, user.supabaseUserId);
@@ -551,6 +565,54 @@ export class ActivitiesService {
       joinedAt: participation.joined_at ?? null,
       approvedAt: participation.approved_at ?? null,
     };
+  }
+
+  private async notifyParticipantsOfScheduleChange(
+    activity: { id: string; title: string },
+    hostUserId: string,
+    flags: { hasTimeChange: boolean; hasLocationChange: boolean },
+  ) {
+    const participants = await this.prisma.activityParticipant.findMany({
+      where: {
+        activity_id: activity.id,
+        status: {
+          in: ['pending', 'confirmed', 'waitlisted'],
+        },
+      },
+      select: {
+        profile: {
+          select: { user_id: true },
+        },
+      },
+    });
+
+    const recipientUserIds = participants
+      .map((participant) => participant.profile.user_id)
+      .filter((userId) => userId !== hostUserId);
+
+    if (recipientUserIds.length === 0) {
+      return;
+    }
+
+    if (flags.hasTimeChange) {
+      await this.notificationsService.createForRecipients(recipientUserIds, {
+        actorUserId: hostUserId,
+        activityId: activity.id,
+        type: 'activity_time_changed',
+        title: 'Activity time updated',
+        body: `The host updated the date/time for "${activity.title}".`,
+      });
+    }
+
+    if (flags.hasLocationChange) {
+      await this.notificationsService.createForRecipients(recipientUserIds, {
+        actorUserId: hostUserId,
+        activityId: activity.id,
+        type: 'activity_location_changed',
+        title: 'Activity location updated',
+        body: `The host updated the location for "${activity.title}".`,
+      });
+    }
   }
 
   /**

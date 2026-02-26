@@ -14,9 +14,10 @@ import { ActivityMessageAutomationService } from './messages/activity-message-au
 import { ActivityFeedbackController } from './feedback/activity-feedback.controller';
 import { ActivityFeedbackService } from './feedback/activity-feedback.service';
 import { MembershipModule } from 'src/membership/membership.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [MembershipModule],
+  imports: [MembershipModule, NotificationsModule],
   controllers: [
     ActivitiesController,
     ParticipantsController,

@@ -18,6 +18,10 @@ export function validate(config: Record<string, unknown>) {
         FRONTEND_BASE_URL: Joi.string().uri().required(),
         STRIPE_SUCCESS_PATH: Joi.string().required(),
         STRIPE_CANCEL_PATH: Joi.string().required(),
+
+        EMAIL_PROVIDER_MODE: Joi.string().valid('log', 'webhook').default('log'),
+        EMAIL_FROM: Joi.string().email().optional(),
+        EMAIL_WEBHOOK_URL: Joi.string().uri().optional(),
     });
 
     const { error, value } = schema.validate(config, {
