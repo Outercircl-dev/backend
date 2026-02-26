@@ -67,15 +67,6 @@ model user_profiles {
   @@schema("public")
 }
 
-model usernames {
-  username           String    @id @db.VarChar(15)
-  claimed_by_user_id String    @db.Uuid
-  created_at         DateTime? @default(now()) @db.Timestamptz(6)
-
-  @@index([claimed_by_user_id], map: "idx_usernames_claimed_by_user_id")
-  @@schema("public")
-}
-
 /// We could not retrieve columns for the underlying table. Either it has none or you are missing rights to see them. Please check your privileges.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
