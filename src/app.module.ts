@@ -17,6 +17,7 @@ import { ProfileModule } from './v1/profile/profile.module';
 import { ActivitiesModule } from './v1/activities/activities.module';
 import { MembershipModule } from './membership/membership.module';
 import { BillingModule } from './v1/billing/billing.module';
+import { NotificationsModule } from './v1/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,13 +33,13 @@ import { BillingModule } from './v1/billing/billing.module';
     }),
     MembershipTiersModule,
     MembershipModule,
-    ScheduleModule.forRoot(),
     MeModule,
     InterestsModule,
     PrismaModule,
     ProfileModule,
     ActivitiesModule,
-    BillingModule
+    BillingModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

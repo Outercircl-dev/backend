@@ -42,4 +42,13 @@ export class SupabaseAdminService {
       throw error;
     }
   }
+
+  async getUserEmailById(userId: string): Promise<string | null> {
+    const { data, error } = await this.client.auth.admin.getUserById(userId);
+    if (error) {
+      this.logger.warn(`Supabase admin getUserById (email lookup) failed: ${error.message}`);
+      return null;
+    }
+    return data?.user?.email ?? null;
+  }
 }
