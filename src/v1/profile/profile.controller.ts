@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpException, HttpStatus, Logger, Patch, Post, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, HttpException, HttpStatus, Logger, Patch, Post, Query, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { ProfileService, type ProfileInput, type ProfileUpdateInput } from "./profile.service";
 import type { AuthenticatedRequest } from "src/common/interfaces/authenticated-request.interface";
 import { SupabaseAuthGuard } from "src/auth/supabase-auth.guard";
@@ -38,6 +38,35 @@ export class ProfileController {
         }
 
         return profile;
+    }
+
+    @UseGuards(SupabaseAuthGuard)
+    @Get('username-availability')
+    async checkUsernameAvailability(
+        @Req() req: AuthenticatedRequest,
+        @Query('username') username?: string,
+    ) {
+        const supabaseUserId = req.user?.supabaseUserId;
+        if (!supabaseUserId) {
+            throw new UnauthorizedException("supabaseUserId missing from authenticated request");
+        }
+
+        if (!username?.trim()) {
+            throw new BadRequestException(
+                this.buildErrorResponse(
+                    HttpStatus.BAD_REQUEST,
+                    req?.url ?? '/profile/username-availability',
+                    'Username is required',
+                    [{
+                        field: 'username',
+                        code: 'required',
+                        message: 'Username is required',
+                    }],
+                ),
+            );
+        }
+
+        return this.profiles.checkUsernameAvailability(username, supabaseUserId);
     }
 
     @UseGuards(SupabaseAuthGuard)

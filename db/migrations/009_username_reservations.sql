@@ -1,17 +1,5 @@
 -- Migration: 009_username_reservations.sql
--- Description: Add globally unique, non-reusable usernames.
-
--- Permanent username reservation ledger.
--- Rows in this table are never deleted automatically, so usernames remain reserved forever.
-CREATE TABLE IF NOT EXISTS public.usernames (
-  username VARCHAR(15) PRIMARY KEY,
-  claimed_by_user_id UUID NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  CONSTRAINT usernames_format CHECK (username ~ '^[a-z0-9_]{3,15}$')
-);
-
-CREATE INDEX IF NOT EXISTS idx_usernames_claimed_by_user_id
-  ON public.usernames(claimed_by_user_id);
+-- Description: Add globally unique usernames on user profiles.
 
 -- Add current username to profiles for direct lookup/display.
 ALTER TABLE public.user_profiles

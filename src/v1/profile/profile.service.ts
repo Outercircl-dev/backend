@@ -58,47 +58,43 @@ export class ProfileService {
         const parsedDob = this.parseDateOrThrow(dateOfBirth);
 
         try {
-            return await this.prisma.$transaction(async (tx) => {
-                await this.claimUsernameOrThrow(tx, normalizedUsername, supabaseUserId);
-
-                return tx.user_profiles.upsert({
-                    where: { user_id: supabaseUserId },
-                    update: {
-                        username: normalizedUsername,
-                        full_name: fullName,
-                        date_of_birth: parsedDob,
-                        gender,
-                        profile_picture_url: profilePictureUrl,
-                        interests,
-                        bio,
-                        hobbies: hobbies ?? [],
-                        availability: availability ?? {},
-                        distance_radius_km: distanceRadiusKm ?? 25,
-                        accepted_tos: acceptedTos,
-                        accepted_guidelines: acceptedGuidelines,
-                        confirmed_age: confirmedAge,
-                        confirmed_platonic: confirmedPlatonic,
-                        profile_completed: true, // Mark profile as completed when saving via POST
-                    } as any,
-                    create: {
-                        user_id: supabaseUserId,
-                        username: normalizedUsername,
-                        full_name: fullName,
-                        date_of_birth: parsedDob,
-                        gender,
-                        profile_picture_url: profilePictureUrl,
-                        interests,
-                        bio,
-                        hobbies: hobbies ?? [],
-                        availability: availability ?? {},
-                        distance_radius_km: distanceRadiusKm ?? 25,
-                        accepted_tos: acceptedTos,
-                        accepted_guidelines: acceptedGuidelines,
-                        confirmed_age: confirmedAge,
-                        confirmed_platonic: confirmedPlatonic,
-                        profile_completed: true, // Mark profile as completed when creating via POST
-                    } as any,
-                });
+            return await this.prisma.user_profiles.upsert({
+                where: { user_id: supabaseUserId },
+                update: {
+                    username: normalizedUsername,
+                    full_name: fullName,
+                    date_of_birth: parsedDob,
+                    gender,
+                    profile_picture_url: profilePictureUrl,
+                    interests,
+                    bio,
+                    hobbies: hobbies ?? [],
+                    availability: availability ?? {},
+                    distance_radius_km: distanceRadiusKm ?? 25,
+                    accepted_tos: acceptedTos,
+                    accepted_guidelines: acceptedGuidelines,
+                    confirmed_age: confirmedAge,
+                    confirmed_platonic: confirmedPlatonic,
+                    profile_completed: true, // Mark profile as completed when saving via POST
+                } as any,
+                create: {
+                    user_id: supabaseUserId,
+                    username: normalizedUsername,
+                    full_name: fullName,
+                    date_of_birth: parsedDob,
+                    gender,
+                    profile_picture_url: profilePictureUrl,
+                    interests,
+                    bio,
+                    hobbies: hobbies ?? [],
+                    availability: availability ?? {},
+                    distance_radius_km: distanceRadiusKm ?? 25,
+                    accepted_tos: acceptedTos,
+                    accepted_guidelines: acceptedGuidelines,
+                    confirmed_age: confirmedAge,
+                    confirmed_platonic: confirmedPlatonic,
+                    profile_completed: true, // Mark profile as completed when creating via POST
+                } as any,
             });
         } catch (error) {
             if (this.isUsernameConflict(error)) {
@@ -124,20 +120,9 @@ export class ProfileService {
         if (input.availability !== undefined) updateData.availability = input.availability;
 
         try {
-            if (updateData.username === undefined) {
-                return this.prisma.user_profiles.update({
-                    where: { user_id: userId },
-                    data: updateData,
-                });
-            }
-
-            return await this.prisma.$transaction(async (tx) => {
-                await this.claimUsernameOrThrow(tx, updateData.username, userId);
-
-                return tx.user_profiles.update({
-                    where: { user_id: userId },
-                    data: updateData,
-                });
+            return await this.prisma.user_profiles.update({
+                where: { user_id: userId },
+                data: updateData,
             });
         } catch (error) {
             if (this.isUsernameConflict(error)) {
@@ -145,6 +130,24 @@ export class ProfileService {
             }
             throw error;
         }
+    }
+
+    async checkUsernameAvailability(username: string, currentUserId: string) {
+        const normalizedUsername = this.normalizeUsernameOrThrow(username);
+        const existingProfile = await this.prisma.user_profiles.findUnique({
+            where: { username: normalizedUsername },
+            select: { user_id: true },
+        });
+
+        if (!existingProfile) {
+            return { available: true, username: normalizedUsername };
+        }
+
+        if (existingProfile.user_id === currentUserId) {
+            return { available: true, username: normalizedUsername };
+        }
+
+        return { available: false, username: normalizedUsername };
     }
 
     async getProfile(userId: string) {
@@ -208,29 +211,6 @@ export class ProfileService {
         }
 
         return normalized;
-    }
-
-    private async claimUsernameOrThrow(
-        tx: Prisma.TransactionClient,
-        username: string,
-        supabaseUserId: string,
-    ) {
-        const existingReservation = await tx.usernames.findUnique({
-            where: { username },
-        });
-
-        if (existingReservation && existingReservation.claimed_by_user_id !== supabaseUserId) {
-            throw this.buildUsernameTakenException(username);
-        }
-
-        if (!existingReservation) {
-            await tx.usernames.create({
-                data: {
-                    username,
-                    claimed_by_user_id: supabaseUserId,
-                },
-            });
-        }
     }
 
     private isUsernameConflict(error: unknown): boolean {

@@ -1,13 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from 'src/generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProfileService, type ProfileInput } from './profile.service';
 
-describe('ProfileService username reservations', () => {
+describe('ProfileService usernames', () => {
   let service: ProfileService;
   let prisma: {
     user_profiles: any;
-    usernames: any;
     activity: any;
     $transaction: jest.Mock;
   };
@@ -33,10 +33,6 @@ describe('ProfileService username reservations', () => {
         update: jest.fn(),
         findUnique: jest.fn(),
         delete: jest.fn(),
-      },
-      usernames: {
-        findUnique: jest.fn(),
-        create: jest.fn(),
       },
       activity: {
         deleteMany: jest.fn(),
@@ -71,54 +67,45 @@ describe('ProfileService username reservations', () => {
       service.upsertProfile(buildInput({ username: 'Bad Name' })),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    expect(prisma.usernames.findUnique).not.toHaveBeenCalled();
     expect(prisma.user_profiles.upsert).not.toHaveBeenCalled();
   });
 
-  it('rejects duplicate username claimed by another user', async () => {
-    prisma.usernames.findUnique.mockResolvedValue({
-      username: 'taken_name',
-      claimed_by_user_id: 'someone-else',
-    });
+  it('rejects duplicate username when unique constraint conflicts', async () => {
+    prisma.user_profiles.upsert.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('duplicate', {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: { target: ['username'] },
+      }),
+    );
 
     await expect(
       service.upsertProfile(buildInput({ username: 'taken_name' })),
     ).rejects.toBeInstanceOf(BadRequestException);
-
-    expect(prisma.usernames.create).not.toHaveBeenCalled();
-    expect(prisma.user_profiles.upsert).not.toHaveBeenCalled();
   });
 
-  it('allows idempotent submit when username is already claimed by same user', async () => {
-    prisma.usernames.findUnique.mockResolvedValue({
-      username: 'same_name',
-      claimed_by_user_id: 'user-1',
-    });
+  it('allows reused username after previous profile deletion', async () => {
     prisma.user_profiles.upsert.mockResolvedValue({
-      id: 'profile-1',
-      user_id: 'user-1',
-      username: 'same_name',
+      id: 'profile-2',
+      user_id: 'user-2',
+      username: 'reusable_name',
     });
 
     const result = await service.upsertProfile(
-      buildInput({ username: 'same_name' }),
+      buildInput({
+        supabaseUserId: 'user-2',
+        username: 'reusable_name',
+      }),
     );
 
-    expect(prisma.usernames.create).not.toHaveBeenCalled();
-    expect(prisma.user_profiles.upsert).toHaveBeenCalled();
-    expect(result.username).toBe('same_name');
+    expect(result.username).toBe('reusable_name');
   });
 
-  it('keeps usernames permanently reserved after profile deletion', async () => {
-    prisma.usernames.findUnique.mockResolvedValue({
-      username: 'legacy_name',
-      claimed_by_user_id: 'deleted-user',
-    });
+  it('reports username availability as false when claimed by another user', async () => {
+    prisma.user_profiles.findUnique.mockResolvedValue({ user_id: 'someone-else' });
 
-    await expect(
-      service.updateProfile('new-user', { username: 'legacy_name' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = await service.checkUsernameAvailability('taken_name', 'user-1');
 
-    expect(prisma.user_profiles.update).not.toHaveBeenCalled();
+    expect(result.available).toBe(false);
   });
 });
