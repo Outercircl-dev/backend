@@ -7,6 +7,7 @@ import { UpdateActivityDto } from './dto/update-activity.dto';
 import { ActivityMessagesService } from './messages/activity-messages.service';
 import { MembershipTiersService } from 'src/config/membership-tiers.service';
 import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('ActivitiesService', () => {
   let service: ActivitiesService;
@@ -14,6 +15,7 @@ describe('ActivitiesService', () => {
   let messagesService: { createSystemMessage: jest.Mock };
   let membershipTiersService: { getTierRules: jest.Mock };
   let membershipSubscriptionsService: { resolveTierForUserId: jest.Mock };
+  let notificationsService: { createForRecipients: jest.Mock };
 
   const mockPrismaService = {
     activity: {
@@ -30,6 +32,7 @@ describe('ActivitiesService', () => {
     activityParticipant: {
       count: jest.fn(),
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     activityGroup: {
       findUnique: jest.fn(),
@@ -54,6 +57,9 @@ describe('ActivitiesService', () => {
   const mockMembershipSubscriptionsService = {
     resolveTierForUserId: jest.fn(),
   };
+  const mockNotificationsService = {
+    createForRecipients: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -75,6 +81,10 @@ describe('ActivitiesService', () => {
           provide: MembershipSubscriptionsService,
           useValue: mockMembershipSubscriptionsService,
         },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
+        },
       ],
     }).compile();
 
@@ -83,6 +93,7 @@ describe('ActivitiesService', () => {
     messagesService = module.get(ActivityMessagesService);
     membershipTiersService = module.get(MembershipTiersService);
     membershipSubscriptionsService = module.get(MembershipSubscriptionsService);
+    notificationsService = module.get(NotificationsService);
 
     jest.clearAllMocks();
     membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('FREEMIUM');
@@ -109,12 +120,14 @@ describe('ActivitiesService', () => {
     });
     mockPrismaService.activityParticipant.count.mockResolvedValue(0);
     mockPrismaService.activityParticipant.findUnique.mockResolvedValue(null);
+    mockPrismaService.activityParticipant.findMany.mockResolvedValue([]);
     mockPrismaService.activityGroup.findUnique.mockResolvedValue(null);
     mockPrismaService.activityGroupMember.findUnique.mockResolvedValue(null);
     mockPrismaService.activitySeries.findUnique.mockResolvedValue(null);
     mockPrismaService.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1' });
     mockPrismaService.activity.count.mockResolvedValue(0);
     mockMessagesService.createSystemMessage.mockResolvedValue(undefined);
+    notificationsService.createForRecipients.mockResolvedValue(0);
   });
 
   it('should be defined', () => {
