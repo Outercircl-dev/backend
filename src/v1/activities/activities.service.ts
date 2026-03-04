@@ -1,11 +1,25 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
-import { ActivityResponseDto, ViewerParticipationMeta, ParticipationState } from './dto/activity-response.dto';
+import {
+  ActivityResponseDto,
+  ViewerParticipationMeta,
+  ParticipationState,
+} from './dto/activity-response.dto';
 import { Prisma } from 'src/generated/prisma/client';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
-import { assertGroupsEnabled, assertHostCapacity, assertHostMonthlyLimit, assertVerifiedHost } from './hosting-rules';
+import {
+  assertGroupsEnabled,
+  assertHostCapacity,
+  assertHostMonthlyLimit,
+  assertVerifiedHost,
+} from './hosting-rules';
 import { ActivityMessagesService } from './messages/activity-messages.service';
 import { MembershipTiersService } from 'src/config/membership-tiers.service';
 import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
@@ -21,13 +35,21 @@ export class ActivitiesService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async create(user: AuthenticatedUser, dto: CreateActivityDto): Promise<ActivityResponseDto> {
+  async create(
+    user: AuthenticatedUser,
+    dto: CreateActivityDto,
+  ): Promise<ActivityResponseDto> {
     assertVerifiedHost(user);
     if (!user?.supabaseUserId) {
-      throw new BadRequestException('supabaseUserId missing from authenticated request');
+      throw new BadRequestException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
 
-    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    const tierKey =
+      await this.membershipSubscriptionsService.resolveTierForUserId(
+        user.supabaseUserId,
+      );
     const tierRules = this.membershipTiersService.getTierRules(tierKey);
     assertHostCapacity(tierRules, dto.maxParticipants);
     // Validate interests exist in the interests table
@@ -39,8 +61,12 @@ export class ActivitiesService {
         select: { slug: true },
       });
 
-      const existingSlugs = existingInterests.map((interest: { slug: string }) => interest.slug);
-      const invalidInterests = dto.interests.filter((slug: string) => !existingSlugs.includes(slug));
+      const existingSlugs = existingInterests.map(
+        (interest: { slug: string }) => interest.slug,
+      );
+      const invalidInterests = dto.interests.filter(
+        (slug: string) => !existingSlugs.includes(slug),
+      );
 
       if (invalidInterests.length > 0) {
         throw new BadRequestException(
@@ -51,16 +77,24 @@ export class ActivitiesService {
 
     // Parse activity date (DTO already validates format via @IsDateString)
     const activityDate = new Date(dto.activityDate);
+    const timezone = dto.timezone ?? 'UTC';
+    this.assertStartDateTimeIsInFuture(
+      dto.activityDate,
+      dto.startTime,
+      timezone,
+    );
 
     // Validate end time is after start time (including seconds)
     const startTimeParts = dto.startTime.split(':');
     const endTimeParts = dto.endTime.split(':');
-    const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
-                        parseInt(startTimeParts[1]) * 60 + 
-                        (parseInt(startTimeParts[2] || '0'));
-    const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
-                      parseInt(endTimeParts[1]) * 60 + 
-                      (parseInt(endTimeParts[2] || '0'));
+    const startSeconds =
+      parseInt(startTimeParts[0]) * 3600 +
+      parseInt(startTimeParts[1]) * 60 +
+      parseInt(startTimeParts[2] || '0');
+    const endSeconds =
+      parseInt(endTimeParts[0]) * 3600 +
+      parseInt(endTimeParts[1]) * 60 +
+      parseInt(endTimeParts[2] || '0');
     if (endSeconds <= startSeconds) {
       throw new BadRequestException('End time must be after start time');
     }
@@ -117,7 +151,9 @@ export class ActivitiesService {
           owner_profile_id: profile.id,
           frequency: dto.recurrence.frequency,
           interval: dto.recurrence.interval,
-          ends_on: dto.recurrence.endsOn ? new Date(dto.recurrence.endsOn) : null,
+          ends_on: dto.recurrence.endsOn
+            ? new Date(dto.recurrence.endsOn)
+            : null,
           occurrences: dto.recurrence.occurrences ?? null,
         },
       });
@@ -156,7 +192,13 @@ export class ActivitiesService {
       limit?: number;
     },
     viewerId?: string,
-  ): Promise<{ items: ActivityResponseDto[]; total: number; page: number; limit: number; totalPages: number }> {
+  ): Promise<{
+    items: ActivityResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
     const skip = (page - 1) * limit;
@@ -164,11 +206,18 @@ export class ActivitiesService {
     const where: Prisma.ActivityWhereInput = {};
     if (filters?.status) {
       // Validate and cast status to enum type
-      const validStatuses = ['draft', 'published', 'completed', 'cancelled'] as const;
+      const validStatuses = [
+        'draft',
+        'published',
+        'completed',
+        'cancelled',
+      ] as const;
       if (validStatuses.includes(filters.status as any)) {
         where.status = filters.status as any; // Cast to any to satisfy Prisma enum type
       } else {
-        throw new BadRequestException(`Invalid status: ${filters.status}. Must be one of: ${validStatuses.join(', ')}`);
+        throw new BadRequestException(
+          `Invalid status: ${filters.status}. Must be one of: ${validStatuses.join(', ')}`,
+        );
       }
     }
     if (filters?.hostId) {
@@ -210,10 +259,16 @@ export class ActivitiesService {
     return this.mapToResponseDto(activity, viewerId);
   }
 
-  async update(id: string, user: AuthenticatedUser, dto: UpdateActivityDto): Promise<ActivityResponseDto> {
+  async update(
+    id: string,
+    user: AuthenticatedUser,
+    dto: UpdateActivityDto,
+  ): Promise<ActivityResponseDto> {
     assertVerifiedHost(user);
     if (!user?.supabaseUserId) {
-      throw new BadRequestException('supabaseUserId missing from authenticated request');
+      throw new BadRequestException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
     // Check if activity exists
     const existing = await this.prisma.activity.findUnique({
@@ -230,7 +285,9 @@ export class ActivitiesService {
     }
 
     if (this.hasActivityStarted(existing)) {
-      throw new ForbiddenException('Activity has already started and can no longer be edited');
+      throw new ForbiddenException(
+        'Activity has already started and can no longer be edited',
+      );
     }
 
     // Validate interests if provided
@@ -242,8 +299,12 @@ export class ActivitiesService {
         select: { slug: true },
       });
 
-      const existingSlugs = existingInterests.map((interest: { slug: string }) => interest.slug);
-      const invalidInterests = dto.interests.filter((slug: string) => !existingSlugs.includes(slug));
+      const existingSlugs = existingInterests.map(
+        (interest: { slug: string }) => interest.slug,
+      );
+      const invalidInterests = dto.interests.filter(
+        (slug: string) => !existingSlugs.includes(slug),
+      );
 
       if (invalidInterests.length > 0) {
         throw new BadRequestException(
@@ -257,18 +318,22 @@ export class ActivitiesService {
 
     // Handle times
     const startTime = this.convertTimeStringToDate(dto.startTime);
-    const endTime = dto.endTime ? this.convertTimeStringToDate(dto.endTime) : existing.end_time;
+    const endTime = dto.endTime
+      ? this.convertTimeStringToDate(dto.endTime)
+      : existing.end_time;
 
     // Validate end time is after start time (including seconds)
     if (dto.endTime) {
       const startTimeParts = dto.startTime.split(':');
       const endTimeParts = dto.endTime.split(':');
-      const startSeconds = parseInt(startTimeParts[0]) * 3600 + 
-                          parseInt(startTimeParts[1]) * 60 + 
-                          (parseInt(startTimeParts[2] || '0'));
-      const endSeconds = parseInt(endTimeParts[0]) * 3600 + 
-                        parseInt(endTimeParts[1]) * 60 + 
-                        (parseInt(endTimeParts[2] || '0'));
+      const startSeconds =
+        parseInt(startTimeParts[0]) * 3600 +
+        parseInt(startTimeParts[1]) * 60 +
+        parseInt(startTimeParts[2] || '0');
+      const endSeconds =
+        parseInt(endTimeParts[0]) * 3600 +
+        parseInt(endTimeParts[1]) * 60 +
+        parseInt(endTimeParts[2] || '0');
       if (endSeconds <= startSeconds) {
         throw new BadRequestException('End time must be after start time');
       }
@@ -277,22 +342,35 @@ export class ActivitiesService {
     const changeNotes: string[] = [];
     let hasTimeChange = false;
     let hasLocationChange = false;
-    if (dto.activityDate && activityDate.toISOString().split('T')[0] !== existing.activity_date.toISOString().split('T')[0]) {
+    if (
+      dto.activityDate &&
+      activityDate.toISOString().split('T')[0] !==
+        existing.activity_date.toISOString().split('T')[0]
+    ) {
       changeNotes.push('date updated');
     }
-    if (dto.startTime && this.convertDateToTimeString(startTime) !== this.convertDateToTimeString(existing.start_time)) {
+    if (
+      dto.startTime &&
+      this.convertDateToTimeString(startTime) !==
+        this.convertDateToTimeString(existing.start_time)
+    ) {
       changeNotes.push('start time updated');
       hasTimeChange = true;
     }
     if (dto.endTime) {
-      const existingEnd = existing.end_time ? this.convertDateToTimeString(existing.end_time) : null;
+      const existingEnd = existing.end_time
+        ? this.convertDateToTimeString(existing.end_time)
+        : null;
       const nextEnd = endTime ? this.convertDateToTimeString(endTime) : null;
       if (existingEnd !== nextEnd) {
         changeNotes.push('end time updated');
         hasTimeChange = true;
       }
     }
-    if (dto.location && JSON.stringify(dto.location) !== JSON.stringify(existing.location)) {
+    if (
+      dto.location &&
+      JSON.stringify(dto.location) !== JSON.stringify(existing.location)
+    ) {
       changeNotes.push('location updated');
       hasLocationChange = true;
     }
@@ -308,7 +386,10 @@ export class ActivitiesService {
       start_time: startTime,
       end_time: endTime,
     };
-    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    const tierKey =
+      await this.membershipSubscriptionsService.resolveTierForUserId(
+        user.supabaseUserId,
+      );
     const tierRules = this.membershipTiersService.getTierRules(tierKey);
     assertHostCapacity(tierRules, dto.maxParticipants);
     updateData.max_participants = dto.maxParticipants;
@@ -351,7 +432,9 @@ export class ActivitiesService {
             owner_profile_id: profile.id,
             frequency: dto.recurrence.frequency,
             interval: dto.recurrence.interval,
-            ends_on: dto.recurrence.endsOn ? new Date(dto.recurrence.endsOn) : null,
+            ends_on: dto.recurrence.endsOn
+              ? new Date(dto.recurrence.endsOn)
+              : null,
             occurrences: dto.recurrence.occurrences ?? null,
           },
         });
@@ -373,10 +456,14 @@ export class ActivitiesService {
     }
 
     if (hasTimeChange || hasLocationChange) {
-      await this.notifyParticipantsOfScheduleChange(activity, user.supabaseUserId, {
-        hasTimeChange,
-        hasLocationChange,
-      });
+      await this.notifyParticipantsOfScheduleChange(
+        activity,
+        user.supabaseUserId,
+        {
+          hasTimeChange,
+          hasLocationChange,
+        },
+      );
     }
 
     return this.mapToResponseDto(activity, user.supabaseUserId);
@@ -385,7 +472,9 @@ export class ActivitiesService {
   async remove(id: string, user: AuthenticatedUser): Promise<void> {
     assertVerifiedHost(user);
     if (!user?.supabaseUserId) {
-      throw new BadRequestException('supabaseUserId missing from authenticated request');
+      throw new BadRequestException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
     const activity = await this.prisma.activity.findUnique({
       where: { id },
@@ -404,19 +493,38 @@ export class ActivitiesService {
     });
   }
 
-  private hasActivityStarted(activity: { activity_date: Date; start_time: Date | string }): boolean {
-    const start = this.buildActivityStart(activity.activity_date, activity.start_time);
+  private hasActivityStarted(activity: {
+    activity_date: Date;
+    start_time: Date | string;
+  }): boolean {
+    const start = this.buildActivityStart(
+      activity.activity_date,
+      activity.start_time,
+    );
     return start.getTime() <= Date.now();
   }
 
-  private buildActivityStart(activityDate: Date, startTime: Date | string): Date {
+  private buildActivityStart(
+    activityDate: Date,
+    startTime: Date | string,
+  ): Date {
     const date = new Date(activityDate);
     if (typeof startTime === 'string') {
       const [hours, minutes, seconds = '0'] = startTime.split(':');
-      date.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
+      date.setHours(
+        parseInt(hours, 10),
+        parseInt(minutes, 10),
+        parseInt(seconds, 10),
+        0,
+      );
       return date;
     }
-    date.setHours(startTime.getHours(), startTime.getMinutes(), startTime.getSeconds(), 0);
+    date.setHours(
+      startTime.getHours(),
+      startTime.getMinutes(),
+      startTime.getSeconds(),
+      0,
+    );
     return date;
   }
 
@@ -432,44 +540,50 @@ export class ActivitiesService {
       select: { id: true },
     });
     if (!profile) {
-      throw new BadRequestException('Complete your profile before hosting activities');
+      throw new BadRequestException(
+        'Complete your profile before hosting activities',
+      );
     }
     return profile;
   }
 
-  private async mapToResponseDto(activity: any, viewerId?: string): Promise<ActivityResponseDto> {
-    const [confirmedCount, waitlistCount, viewerProfile, group, series] = await Promise.all([
-      this.prisma.activityParticipant.count({
-        where: { activity_id: activity.id, status: 'confirmed' },
-      }),
-      this.prisma.activityParticipant.count({
-        where: { activity_id: activity.id, status: 'waitlisted' },
-      }),
-      viewerId
-        ? this.prisma.user_profiles.findUnique({
-            where: { user_id: viewerId },
-            select: { id: true },
-          })
-        : Promise.resolve(null),
-      activity.group_id
-        ? this.prisma.activityGroup.findUnique({
-            where: { id: activity.group_id },
-            select: { id: true, name: true, is_public: true },
-          })
-        : Promise.resolve(null),
-      activity.series_id
-        ? this.prisma.activitySeries.findUnique({
-            where: { id: activity.series_id },
-            select: {
-              id: true,
-              frequency: true,
-              interval: true,
-              ends_on: true,
-              occurrences: true,
-            },
-          })
-        : Promise.resolve(null),
-    ]);
+  private async mapToResponseDto(
+    activity: any,
+    viewerId?: string,
+  ): Promise<ActivityResponseDto> {
+    const [confirmedCount, waitlistCount, viewerProfile, group, series] =
+      await Promise.all([
+        this.prisma.activityParticipant.count({
+          where: { activity_id: activity.id, status: 'confirmed' },
+        }),
+        this.prisma.activityParticipant.count({
+          where: { activity_id: activity.id, status: 'waitlisted' },
+        }),
+        viewerId
+          ? this.prisma.user_profiles.findUnique({
+              where: { user_id: viewerId },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+        activity.group_id
+          ? this.prisma.activityGroup.findUnique({
+              where: { id: activity.group_id },
+              select: { id: true, name: true, is_public: true },
+            })
+          : Promise.resolve(null),
+        activity.series_id
+          ? this.prisma.activitySeries.findUnique({
+              where: { id: activity.series_id },
+              select: {
+                id: true,
+                frequency: true,
+                interval: true,
+                ends_on: true,
+                occurrences: true,
+              },
+            })
+          : Promise.resolve(null),
+      ]);
 
     let viewerParticipation: any | null = null;
     if (viewerProfile) {
@@ -495,10 +609,15 @@ export class ActivitiesService {
       description: activity.description,
       category: activity.category,
       interests: activity.interests as string[],
-      location: this.prepareLocationForViewer(activity.location, Boolean(canSeeLocation)),
+      location: this.prepareLocationForViewer(
+        activity.location,
+        Boolean(canSeeLocation),
+      ),
       activityDate: activity.activity_date.toISOString().split('T')[0],
       startTime: this.convertDateToTimeString(activity.start_time),
-      endTime: activity.end_time ? this.convertDateToTimeString(activity.end_time) : null,
+      endTime: activity.end_time
+        ? this.convertDateToTimeString(activity.end_time)
+        : null,
       maxParticipants: activity.max_participants,
       currentParticipants: confirmedCount,
       waitlistCount,
@@ -516,7 +635,9 @@ export class ActivitiesService {
             id: series.id,
             frequency: series.frequency,
             interval: series.interval,
-            endsOn: series.ends_on ? series.ends_on.toISOString().split('T')[0] : null,
+            endsOn: series.ends_on
+              ? series.ends_on.toISOString().split('T')[0]
+              : null,
             occurrences: series.occurrences ?? null,
           }
         : null,
@@ -540,7 +661,11 @@ export class ActivitiesService {
       return { latitude: 0, longitude: 0 };
     }
 
-    const location = rawLocation as { latitude: number; longitude: number; address?: string };
+    const location = rawLocation as {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
     if (revealExactLocation || !location.address) {
       return location;
     }
@@ -549,7 +674,9 @@ export class ActivitiesService {
     return rest;
   }
 
-  private formatViewerParticipation(participation: any | null): ViewerParticipationMeta | undefined {
+  private formatViewerParticipation(
+    participation: any | null,
+  ): ViewerParticipationMeta | undefined {
     if (!participation) {
       return undefined;
     }
@@ -621,7 +748,12 @@ export class ActivitiesService {
   private convertTimeStringToDate(timeString: string): Date {
     const [hours, minutes, seconds = '0'] = timeString.split(':');
     const date = new Date();
-    date.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
+    date.setHours(
+      parseInt(hours, 10),
+      parseInt(minutes, 10),
+      parseInt(seconds, 10),
+      0,
+    );
     return date;
   }
 
@@ -640,12 +772,63 @@ export class ActivitiesService {
       // Already in HH:mm:ss format
       return date;
     }
-    
+
     // It's a Date object
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     const seconds = date.getSeconds().toString().padStart(2, '0');
     return `${hours}:${minutes}:${seconds}`;
   }
-}
 
+  private assertStartDateTimeIsInFuture(
+    activityDate: string,
+    startTime: string,
+    timezone: string,
+  ): void {
+    if (!this.isValidIanaTimezone(timezone)) {
+      throw new BadRequestException(
+        'Invalid timezone. Please use a valid IANA timezone identifier.',
+      );
+    }
+
+    const now = new Date();
+    const currentDateInTimezone = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now);
+    const currentTimeInTimezone = new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(now);
+
+    const targetTime = this.normalizeTimeString(startTime);
+    if (
+      activityDate < currentDateInTimezone ||
+      (activityDate === currentDateInTimezone &&
+        targetTime <= currentTimeInTimezone)
+    ) {
+      throw new BadRequestException(
+        'Activity start date/time must be in the future',
+      );
+    }
+  }
+
+  private isValidIanaTimezone(timezone: string): boolean {
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private normalizeTimeString(timeString: string): string {
+    const [hours, minutes, seconds = '00'] = timeString.split(':');
+    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
+  }
+}

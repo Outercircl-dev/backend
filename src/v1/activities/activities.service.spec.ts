@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ActivitiesService } from './activities.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
@@ -96,7 +100,9 @@ describe('ActivitiesService', () => {
     notificationsService = module.get(NotificationsService);
 
     jest.clearAllMocks();
-    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('FREEMIUM');
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue(
+      'FREEMIUM',
+    );
     membershipTiersService.getTierRules.mockReturnValue({
       hosting: {
         maxParticipantsPerActivity: 4,
@@ -124,7 +130,9 @@ describe('ActivitiesService', () => {
     mockPrismaService.activityGroup.findUnique.mockResolvedValue(null);
     mockPrismaService.activityGroupMember.findUnique.mockResolvedValue(null);
     mockPrismaService.activitySeries.findUnique.mockResolvedValue(null);
-    mockPrismaService.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1' });
+    mockPrismaService.user_profiles.findUnique.mockResolvedValue({
+      id: 'profile-1',
+    });
     mockPrismaService.activity.count.mockResolvedValue(0);
     mockMessagesService.createSystemMessage.mockResolvedValue(undefined);
     notificationsService.createForRecipients.mockResolvedValue(0);
@@ -152,18 +160,16 @@ describe('ActivitiesService', () => {
         longitude: -122.4194,
         address: 'San Francisco, CA',
       },
-      activityDate: '2025-12-31',
+      activityDate: '2099-12-31',
       startTime: '10:00',
       endTime: '12:00',
+      timezone: 'UTC',
       maxParticipants: 4,
       isPublic: true,
     };
 
     it('should create an activity successfully', async () => {
-      const mockInterests = [
-        { slug: 'basketball' },
-        { slug: 'football' },
-      ];
+      const mockInterests = [{ slug: 'basketball' }, { slug: 'football' }];
       const mockActivity = {
         id: 'activity-123',
         host_id: hostId,
@@ -200,9 +206,13 @@ describe('ActivitiesService', () => {
     });
 
     it('should throw BadRequestException for invalid interests', async () => {
-      mockPrismaService.interest.findMany.mockResolvedValue([{ slug: 'basketball' }]);
+      mockPrismaService.interest.findMany.mockResolvedValue([
+        { slug: 'basketball' },
+      ]);
 
-      await expect(service.create(hostUser, createDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(hostUser, createDto)).rejects.toThrow(
+        BadRequestException,
+      );
       expect(mockPrismaService.activity.create).not.toHaveBeenCalled();
     });
 
@@ -213,17 +223,23 @@ describe('ActivitiesService', () => {
         type: 'FREEMIUM' as const,
         tierClass: 'freemium',
       };
-      await expect(service.create(unverifiedUser, createDto)).rejects.toThrow(ForbiddenException);
+      await expect(service.create(unverifiedUser, createDto)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should enforce free-tier participant cap', async () => {
       const invalidDto = { ...createDto, maxParticipants: 6 };
-      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(ForbiddenException);
+      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw BadRequestException for invalid location', async () => {
       const invalidDto = { ...createDto, location: { latitude: 37.7749 } };
-      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException when end time is before start time', async () => {
@@ -233,7 +249,41 @@ describe('ActivitiesService', () => {
         { slug: 'football' },
       ]);
 
-      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw BadRequestException when activity start date/time is in the past', async () => {
+      const invalidDto = {
+        ...createDto,
+        activityDate: '2000-01-01',
+        startTime: '00:00',
+        endTime: '01:00',
+        timezone: 'UTC',
+      };
+      mockPrismaService.interest.findMany.mockResolvedValue([
+        { slug: 'basketball' },
+        { slug: 'football' },
+      ]);
+
+      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(
+        'Activity start date/time must be in the future',
+      );
+      expect(mockPrismaService.activity.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException for invalid timezone', async () => {
+      const invalidDto = { ...createDto, timezone: 'Mars/OlympusMons' };
+      mockPrismaService.interest.findMany.mockResolvedValue([
+        { slug: 'basketball' },
+        { slug: 'football' },
+      ]);
+
+      await expect(service.create(hostUser, invalidDto)).rejects.toThrow(
+        'Invalid timezone. Please use a valid IANA timezone identifier.',
+      );
+      expect(mockPrismaService.activity.create).not.toHaveBeenCalled();
     });
   });
 
@@ -332,7 +382,9 @@ describe('ActivitiesService', () => {
     it('should throw NotFoundException when activity not found', async () => {
       mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('non-existent')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -386,7 +438,9 @@ describe('ActivitiesService', () => {
 
       const updatedActivity = { ...existingActivity, title: 'Updated Title' };
 
-      mockPrismaService.interest.findMany.mockResolvedValue([{ slug: 'basketball' }]);
+      mockPrismaService.interest.findMany.mockResolvedValue([
+        { slug: 'basketball' },
+      ]);
       mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
       mockPrismaService.activity.update.mockResolvedValue(updatedActivity);
 
@@ -420,18 +474,18 @@ describe('ActivitiesService', () => {
 
       mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
 
-      await expect(service.update(activityId, hostUser, updateDto)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.update(activityId, hostUser, updateDto),
+      ).rejects.toThrow(ForbiddenException);
       expect(mockPrismaService.activity.update).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when activity not found', async () => {
       mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
-      await expect(service.update(activityId, hostUser, updateDto)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.update(activityId, hostUser, updateDto),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -501,17 +555,20 @@ describe('ActivitiesService', () => {
 
       mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
 
-      await expect(service.remove(activityId, hostUser)).rejects.toThrow(ForbiddenException);
+      await expect(service.remove(activityId, hostUser)).rejects.toThrow(
+        ForbiddenException,
+      );
       expect(mockPrismaService.activity.delete).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when activity not found', async () => {
       mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove(activityId, hostUser)).rejects.toThrow(NotFoundException);
+      await expect(service.remove(activityId, hostUser)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   // Legacy participant increment/decrement functionality moved to ParticipantsService tests.
 });
-
