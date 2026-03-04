@@ -33,4 +33,3 @@ export class UpdateNotificationPreferencesDto {
   @IsBoolean()
   channelBrowser?: boolean;
 }
-

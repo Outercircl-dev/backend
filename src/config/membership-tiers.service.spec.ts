@@ -49,7 +49,9 @@ describe('MembershipTiersService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPrismaService.membershipTiersConfig.findFirst.mockResolvedValue(validConfigRow);
+    mockPrismaService.membershipTiersConfig.findFirst.mockResolvedValue(
+      validConfigRow,
+    );
   });
 
   describe('when config is loaded from database', () => {
@@ -69,7 +71,9 @@ describe('MembershipTiersService', () => {
     });
 
     it('loads model via findFirst with id 1', async () => {
-      expect(mockPrismaService.membershipTiersConfig.findFirst).toHaveBeenCalledWith({
+      expect(
+        mockPrismaService.membershipTiersConfig.findFirst,
+      ).toHaveBeenCalledWith({
         where: { id: 1 },
         orderBy: { id: 'asc' },
       });
@@ -118,7 +122,9 @@ describe('MembershipTiersService', () => {
     });
 
     it('getLogicDifferences returns logic differences array', () => {
-      expect(service.getLogicDifferences()).toEqual(validConfigRow.logic_differences);
+      expect(service.getLogicDifferences()).toEqual(
+        validConfigRow.logic_differences,
+      );
     });
   });
 
@@ -161,7 +167,9 @@ describe('MembershipTiersService', () => {
       }).compile();
 
       service = module.get(MembershipTiersService);
-      await expect(service.onModuleInit()).rejects.toThrow(/missing tiers object/);
+      await expect(service.onModuleInit()).rejects.toThrow(
+        /missing tiers object/,
+      );
     });
   });
 
@@ -172,7 +180,9 @@ describe('MembershipTiersService', () => {
           findFirst: () => new Promise<null>(() => {}),
         },
       };
-      const svc = new MembershipTiersService(neverResolvingPrisma as unknown as PrismaService);
+      const svc = new MembershipTiersService(
+        neverResolvingPrisma as unknown as PrismaService,
+      );
       expect(() => svc.getModel()).toThrow(/not yet loaded/);
     });
   });

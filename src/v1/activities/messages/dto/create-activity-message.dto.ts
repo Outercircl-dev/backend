@@ -1,4 +1,11 @@
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateActivityMessageDto {
   @IsString()
@@ -14,4 +21,3 @@ export class CreateActivityMessageDto {
   @IsBoolean()
   isPinned?: boolean;
 }
-

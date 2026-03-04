@@ -29,7 +29,9 @@ interface SubscriptionUpsertInput {
 
 @Injectable()
 export class MembershipSubscriptionsService {
-  private readonly logger = new Logger(MembershipSubscriptionsService.name, { timestamp: true });
+  private readonly logger = new Logger(MembershipSubscriptionsService.name, {
+    timestamp: true,
+  });
 
   constructor(
     private readonly prisma: PrismaService,
@@ -43,15 +45,22 @@ export class MembershipSubscriptionsService {
     });
   }
 
-  async getSubscriptionByStripeId(stripeCustomerId?: string | null, stripeSubscriptionId?: string | null) {
+  async getSubscriptionByStripeId(
+    stripeCustomerId?: string | null,
+    stripeSubscriptionId?: string | null,
+  ) {
     if (!stripeCustomerId && !stripeSubscriptionId) {
       return null;
     }
     return this.prisma.membershipSubscription.findFirst({
       where: {
         OR: [
-          stripeCustomerId ? { stripe_customer_id: stripeCustomerId } : undefined,
-          stripeSubscriptionId ? { stripe_subscription_id: stripeSubscriptionId } : undefined,
+          stripeCustomerId
+            ? { stripe_customer_id: stripeCustomerId }
+            : undefined,
+          stripeSubscriptionId
+            ? { stripe_subscription_id: stripeSubscriptionId }
+            : undefined,
         ].filter(Boolean) as any,
       },
     });
@@ -68,10 +77,16 @@ export class MembershipSubscriptionsService {
       return defaultTier;
     }
 
-    return this.membershipTiersService.resolveTierKey(subscription.tier) ?? defaultTier;
+    return (
+      this.membershipTiersService.resolveTierKey(subscription.tier) ??
+      defaultTier
+    );
   }
 
-  async syncTierToSupabase(userId: string, tier: MembershipTierKey): Promise<void> {
+  async syncTierToSupabase(
+    userId: string,
+    tier: MembershipTierKey,
+  ): Promise<void> {
     await this.supabaseAdminService.updateSubscriptionTier(userId, tier);
   }
 
@@ -110,7 +125,9 @@ export class MembershipSubscriptionsService {
     );
 
     if (!existing) {
-      this.logger.warn('Subscription upsert skipped: missing userId and no match by Stripe IDs.');
+      this.logger.warn(
+        'Subscription upsert skipped: missing userId and no match by Stripe IDs.',
+      );
       return null;
     }
 

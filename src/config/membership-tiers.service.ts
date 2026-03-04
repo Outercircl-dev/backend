@@ -1,6 +1,10 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import type { MembershipTierKey, MembershipTierModel, MembershipTierRules } from './membership-tiers.model';
+import type {
+  MembershipTierKey,
+  MembershipTierModel,
+  MembershipTierRules,
+} from './membership-tiers.model';
 
 const CONFIG_SOURCE = 'membership_tiers_config (database)';
 
@@ -26,7 +30,10 @@ export class MembershipTiersService implements OnModuleInit {
       version: row.version,
       lastUpdated: row.last_updated,
       defaultTier: row.default_tier_key,
-      tiers: row.tiers as unknown as Record<MembershipTierKey, MembershipTierRules>,
+      tiers: row.tiers as unknown as Record<
+        MembershipTierKey,
+        MembershipTierRules
+      >,
       logic: {
         differences: Array.isArray(row.logic_differences)
           ? (row.logic_differences as string[])
@@ -40,7 +47,9 @@ export class MembershipTiersService implements OnModuleInit {
 
   getModel(): MembershipTierModel {
     if (this.model === null) {
-      throw new Error('Membership tiers not yet loaded. Ensure onModuleInit has completed.');
+      throw new Error(
+        'Membership tiers not yet loaded. Ensure onModuleInit has completed.',
+      );
     }
     return this.model;
   }
@@ -73,7 +82,9 @@ export class MembershipTiersService implements OnModuleInit {
       return undefined;
     }
 
-    return this.getTierNames().find((tier) => tier.toLowerCase() === normalized);
+    return this.getTierNames().find(
+      (tier) => tier.toLowerCase() === normalized,
+    );
   }
 
   getTierClass(tier: MembershipTierKey | undefined): string | undefined {
@@ -94,20 +105,28 @@ export class MembershipTiersService implements OnModuleInit {
     }
 
     if (!model.tiers || typeof model.tiers !== 'object') {
-      throw new Error(`Membership tiers model missing tiers object in ${source}.`);
+      throw new Error(
+        `Membership tiers model missing tiers object in ${source}.`,
+      );
     }
 
     const tierKeys = Object.keys(model.tiers);
     if (tierKeys.length === 0) {
-      throw new Error(`Membership tiers model must define at least one tier in ${source}.`);
+      throw new Error(
+        `Membership tiers model must define at least one tier in ${source}.`,
+      );
     }
 
     if (model.defaultTier && !model.tiers[model.defaultTier]) {
-      throw new Error(`Membership tiers model defaultTier is not defined in tiers in ${source}.`);
+      throw new Error(
+        `Membership tiers model defaultTier is not defined in tiers in ${source}.`,
+      );
     }
 
     if (!Array.isArray(model.logic?.differences)) {
-      throw new Error(`Membership tiers model is missing logic differences in ${source}.`);
+      throw new Error(
+        `Membership tiers model is missing logic differences in ${source}.`,
+      );
     }
   }
 }

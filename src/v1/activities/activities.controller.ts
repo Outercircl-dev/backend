@@ -3,8 +3,7 @@ import {
   Controller,
   Delete,
   Get,
-  HttpException,
-  HttpStatus,
+  BadRequestException,
   Logger,
   Param,
   Patch,
@@ -21,13 +20,14 @@ import { SupabaseAuthGuard } from 'src/auth/supabase-auth.guard';
 import { OptionalSupabaseAuthGuard } from 'src/auth/optional-supabase-auth.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request.interface';
 import type { OptionalAuthenticatedRequest } from 'src/common/interfaces/optional-authenticated-request.interface';
-import type { ErrorDetail, StandardErrorResponse } from 'src/common/interfaces/standard-error-response.interface';
 
 @Controller('activities')
 export class ActivitiesController {
-  private readonly logger = new Logger(ActivitiesController.name, { timestamp: true });
+  private readonly logger = new Logger(ActivitiesController.name, {
+    timestamp: true,
+  });
 
-  constructor(private readonly activitiesService: ActivitiesService) { }
+  constructor(private readonly activitiesService: ActivitiesService) {}
 
   @UseGuards(SupabaseAuthGuard)
   @Post()
@@ -39,33 +39,13 @@ export class ActivitiesController {
     const supabaseUserId = req.user?.supabaseUserId;
 
     if (!supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
-    }
-
-    try {
-      const activity = await this.activitiesService.create(req.user, body);
-      return activity;
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      this.logger.error('Error creating activity', error);
-      throw new HttpException(
-        this.buildErrorResponse(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          req?.url ?? '/activities',
-          'Failed to create activity',
-          [
-            {
-              field: 'activity',
-              code: 'creation_failed',
-              message: error instanceof Error ? error.message : 'Unknown error',
-            },
-          ],
-        ),
-        HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
       );
     }
+
+    const activity = await this.activitiesService.create(req.user, body);
+    return activity;
   }
 
   @UseGuards(OptionalSupabaseAuthGuard)
@@ -82,39 +62,14 @@ export class ActivitiesController {
     const limitNum = limit !== undefined ? parseInt(limit, 10) : undefined;
 
     if (pageNum !== undefined && (isNaN(pageNum) || pageNum < 1)) {
-      throw new HttpException(
-        this.buildErrorResponse(
-          HttpStatus.BAD_REQUEST,
-          '/activities',
-          'Invalid page parameter',
-          [
-            {
-              field: 'page',
-              code: 'invalid',
-              message: 'Page must be a positive integer',
-            },
-          ],
-        ),
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new BadRequestException('Page must be a positive integer');
     }
 
-    if (limitNum !== undefined && (isNaN(limitNum) || limitNum < 1 || limitNum > 100)) {
-      throw new HttpException(
-        this.buildErrorResponse(
-          HttpStatus.BAD_REQUEST,
-          '/activities',
-          'Invalid limit parameter',
-          [
-            {
-              field: 'limit',
-              code: 'invalid',
-              message: 'Limit must be between 1 and 100',
-            },
-          ],
-        ),
-        HttpStatus.BAD_REQUEST,
-      );
+    if (
+      limitNum !== undefined &&
+      (isNaN(limitNum) || limitNum < 1 || limitNum > 100)
+    ) {
+      throw new BadRequestException('Limit must be between 1 and 100');
     }
 
     return this.activitiesService.findAll(
@@ -128,9 +83,30 @@ export class ActivitiesController {
     );
   }
 
+  @UseGuards(SupabaseAuthGuard)
+  @Get('joined/past')
+  async findJoinedPast(
+    @Req() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const supabaseUserId = req.user?.supabaseUserId;
+    if (!supabaseUserId) {
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
+    }
+    const pageNum = page !== undefined ? parseInt(page, 10) : 1;
+    const limitNum = limit !== undefined ? parseInt(limit, 10) : 20;
+    return this.activitiesService.findJoinedPast(req.user, pageNum, limitNum);
+  }
+
   @UseGuards(OptionalSupabaseAuthGuard)
   @Get(':id')
-  async findOne(@Req() req: OptionalAuthenticatedRequest, @Param('id') id: string) {
+  async findOne(
+    @Req() req: OptionalAuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
     this.logger.debug(`Fetching activity with ID: ${id}`);
     return this.activitiesService.findOne(id, req.user?.supabaseUserId);
   }
@@ -146,33 +122,13 @@ export class ActivitiesController {
     const supabaseUserId = req.user?.supabaseUserId;
 
     if (!supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
-    }
-
-    try {
-      const activity = await this.activitiesService.update(id, req.user, body);
-      return activity;
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      this.logger.error(`Error updating activity ${id}`, error);
-      throw new HttpException(
-        this.buildErrorResponse(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          req?.url ?? `/activities/${id}`,
-          'Failed to update activity',
-          [
-            {
-              field: 'activity',
-              code: 'update_failed',
-              message: error instanceof Error ? error.message : 'Unknown error',
-            },
-          ],
-        ),
-        HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
       );
     }
+
+    const activity = await this.activitiesService.update(id, req.user, body);
+    return activity;
   }
 
   @UseGuards(SupabaseAuthGuard)
@@ -182,48 +138,12 @@ export class ActivitiesController {
     const supabaseUserId = req.user?.supabaseUserId;
 
     if (!supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
-    }
-
-    try {
-      await this.activitiesService.remove(id, req.user);
-      return { success: true, message: 'Activity deleted successfully' };
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      this.logger.error(`Error deleting activity ${id}`, error);
-      throw new HttpException(
-        this.buildErrorResponse(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          req?.url ?? `/activities/${id}`,
-          'Failed to delete activity',
-          [
-            {
-              field: 'activity',
-              code: 'delete_failed',
-              message: error instanceof Error ? error.message : 'Unknown error',
-            },
-          ],
-        ),
-        HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
       );
     }
-  }
 
-  private buildErrorResponse(
-    statusCode: number,
-    path: string,
-    message: string,
-    details: ErrorDetail[],
-  ): StandardErrorResponse {
-    return {
-      statusCode,
-      message,
-      path,
-      details,
-      timestamp: new Date().toISOString(),
-    };
+    await this.activitiesService.remove(id, req.user);
+    return { success: true, message: 'Activity deleted successfully' };
   }
 }
-

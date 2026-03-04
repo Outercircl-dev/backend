@@ -25,7 +25,9 @@ export interface ActivityNotificationPayload {
  */
 @Injectable()
 export class ActivityNotificationsService {
-  private readonly logger = new Logger(ActivityNotificationsService.name, { timestamp: true });
+  private readonly logger = new Logger(ActivityNotificationsService.name, {
+    timestamp: true,
+  });
 
   constructor(
     private readonly prisma: PrismaService,
@@ -38,7 +40,9 @@ export class ActivityNotificationsService {
       select: { id: true, host_id: true, title: true },
     });
     if (!activity) {
-      this.logger.warn(`Skipping notification emission for missing activity ${payload.activityId}`);
+      this.logger.warn(
+        `Skipping notification emission for missing activity ${payload.activityId}`,
+      );
       return;
     }
 
@@ -92,7 +96,10 @@ export class ActivityNotificationsService {
     }
   }
 
-  private buildHostUpdateBody(type: ActivityNotificationType, title: string): string {
+  private buildHostUpdateBody(
+    type: ActivityNotificationType,
+    title: string,
+  ): string {
     switch (type) {
       case 'activity.waitlisted':
         return `You were added to the waitlist for "${title}".`;
@@ -109,4 +116,3 @@ export class ActivityNotificationsService {
     }
   }
 }
-

@@ -16,6 +16,7 @@ import {
   Matches,
   IsIn,
   MaxLength,
+  IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -69,6 +70,11 @@ export class CreateActivityDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(1024)
+  imageUrl?: string | null;
 
   @IsString()
   @IsNotEmpty()

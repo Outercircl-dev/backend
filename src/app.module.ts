@@ -18,6 +18,7 @@ import { ActivitiesModule } from './v1/activities/activities.module';
 import { MembershipModule } from './membership/membership.module';
 import { BillingModule } from './v1/billing/billing.module';
 import { NotificationsModule } from './v1/notifications/notifications.module';
+import { UploadsModule } from './v1/uploads/uploads.module';
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { NotificationsModule } from './v1/notifications/notifications.module';
       isGlobal: true,
       envFilePath: '.env',
       load: [configuration],
-      validate: validate
+      validate: validate,
     }),
     MembershipTiersModule,
     MembershipModule,
@@ -40,8 +41,9 @@ import { NotificationsModule } from './v1/notifications/notifications.module';
     ActivitiesModule,
     BillingModule,
     NotificationsModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

@@ -39,9 +39,11 @@ describe('ActivityFeedbackService', () => {
       resolveTierForUserId: jest.fn().mockResolvedValue('FREEMIUM'),
     };
     membershipTiersService = {
-      getTierClass: jest.fn().mockImplementation((tier) =>
-        tier === 'PREMIUM' ? 'premium' : 'freemium',
-      ),
+      getTierClass: jest
+        .fn()
+        .mockImplementation((tier) =>
+          tier === 'PREMIUM' ? 'premium' : 'freemium',
+        ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -70,8 +72,13 @@ describe('ActivityFeedbackService', () => {
   });
 
   it('rejects feedback submission before activity ends', async () => {
-    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('FREEMIUM');
-    prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1', user_id: 'user-1' });
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue(
+      'FREEMIUM',
+    );
+    prisma.user_profiles.findUnique.mockResolvedValue({
+      id: 'profile-1',
+      user_id: 'user-1',
+    });
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
       host_id: 'host-1',
@@ -80,19 +87,27 @@ describe('ActivityFeedbackService', () => {
       start_time: new Date(),
       end_time: new Date(),
     });
-    prisma.activityParticipant.findUnique.mockResolvedValue({ status: 'confirmed' });
+    prisma.activityParticipant.findUnique.mockResolvedValue({
+      status: 'confirmed',
+    });
 
     await expect(
       service.submitFeedback(
         'activity-1',
-        { supabaseUserId: 'user-1', type: 'FREEMIUM', tierClass: 'freemium' } as any,
+        {
+          supabaseUserId: 'user-1',
+          type: 'FREEMIUM',
+          tierClass: 'freemium',
+        } as any,
         { rating: 4, consentToAnalysis: true },
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('flags low ratings after repeated misconduct', async () => {
-    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('PREMIUM');
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue(
+      'PREMIUM',
+    );
     prisma.user_profiles.findUnique.mockImplementation(({ where }: any) => {
       if (where.user_id === 'user-1') {
         return { id: 'profile-1', user_id: 'user-1' };
@@ -110,9 +125,13 @@ describe('ActivityFeedbackService', () => {
       start_time: new Date(),
       end_time: new Date(),
     });
-    prisma.activityParticipant.findUnique.mockResolvedValue({ status: 'confirmed' });
+    prisma.activityParticipant.findUnique.mockResolvedValue({
+      status: 'confirmed',
+    });
     prisma.activityFeedback.findUnique.mockResolvedValue(null);
-    prisma.activityParticipant.findMany.mockResolvedValue([{ profile_id: 'profile-2' }]);
+    prisma.activityParticipant.findMany.mockResolvedValue([
+      { profile_id: 'profile-2' },
+    ]);
 
     const tx = {
       activityFeedback: {
@@ -133,7 +152,11 @@ describe('ActivityFeedbackService', () => {
 
     await service.submitFeedback(
       'activity-1',
-      { supabaseUserId: 'user-1', type: 'PREMIUM', tierClass: 'premium' } as any,
+      {
+        supabaseUserId: 'user-1',
+        type: 'PREMIUM',
+        tierClass: 'premium',
+      } as any,
       {
         rating: 3,
         comment: null,
@@ -161,7 +184,9 @@ describe('ActivityFeedbackService', () => {
   });
 
   it('blocks non-premium users from viewing rating summaries', async () => {
-    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('FREEMIUM');
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue(
+      'FREEMIUM',
+    );
     await expect(
       service.getUserRatingSummary('activity-1', 'profile-2', {
         supabaseUserId: 'user-1',
@@ -173,8 +198,13 @@ describe('ActivityFeedbackService', () => {
   });
 
   it('requires consent to submit feedback', async () => {
-    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue('PREMIUM');
-    prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1', user_id: 'user-1' });
+    membershipSubscriptionsService.resolveTierForUserId.mockResolvedValue(
+      'PREMIUM',
+    );
+    prisma.user_profiles.findUnique.mockResolvedValue({
+      id: 'profile-1',
+      user_id: 'user-1',
+    });
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
       host_id: 'host-1',
@@ -183,15 +213,20 @@ describe('ActivityFeedbackService', () => {
       start_time: new Date(),
       end_time: new Date(),
     });
-    prisma.activityParticipant.findUnique.mockResolvedValue({ status: 'confirmed' });
+    prisma.activityParticipant.findUnique.mockResolvedValue({
+      status: 'confirmed',
+    });
 
     await expect(
       service.submitFeedback(
         'activity-1',
-        { supabaseUserId: 'user-1', type: 'PREMIUM', tierClass: 'premium' } as any,
+        {
+          supabaseUserId: 'user-1',
+          type: 'PREMIUM',
+          tierClass: 'premium',
+        } as any,
         { rating: 4, consentToAnalysis: false },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
-

@@ -22,9 +22,16 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  async listNotifications(@Req() req: AuthenticatedRequest, @Query() query: NotificationQueryDto) {
+  async listNotifications(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: NotificationQueryDto,
+  ) {
     const userId = this.getUserIdOrThrow(req);
-    return this.notificationsService.listForUser(userId, query.page, query.limit);
+    return this.notificationsService.listForUser(
+      userId,
+      query.page,
+      query.limit,
+    );
   }
 
   @Get('unread-count')
@@ -34,7 +41,10 @@ export class NotificationsController {
   }
 
   @Post(':id/read')
-  async markRead(@Req() req: AuthenticatedRequest, @Param('id') notificationId: string) {
+  async markRead(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') notificationId: string,
+  ) {
     const userId = this.getUserIdOrThrow(req);
     return this.notificationsService.markRead(userId, notificationId);
   }
@@ -52,7 +62,10 @@ export class NotificationsController {
   }
 
   @Put('preferences')
-  async updatePreferences(@Req() req: AuthenticatedRequest, @Body() dto: UpdateNotificationPreferencesDto) {
+  async updatePreferences(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateNotificationPreferencesDto,
+  ) {
     const userId = this.getUserIdOrThrow(req);
     return this.notificationsService.updatePreferences(userId, dto);
   }
@@ -60,9 +73,10 @@ export class NotificationsController {
   private getUserIdOrThrow(req: AuthenticatedRequest): string {
     const userId = req.user?.supabaseUserId;
     if (!userId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
     return userId;
   }
 }
-

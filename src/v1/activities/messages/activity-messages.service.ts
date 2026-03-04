@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, activity_message_type } from 'src/generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
@@ -22,14 +27,20 @@ export interface ActivityMessageSummary {
 
 @Injectable()
 export class ActivityMessagesService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async listMessages(
     activityId: string,
     user: AuthenticatedUser,
     page = 1,
     limit = 50,
-  ): Promise<{ items: ActivityMessageSummary[]; total: number; page: number; limit: number; totalPages: number }> {
+  ): Promise<{
+    items: ActivityMessageSummary[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     const supabaseUserId = this.requireSupabaseUserId(user);
     const profile = await this.getProfileForUser(supabaseUserId);
     await this.assertCanAccessActivity(activityId, supabaseUserId, profile.id);
@@ -39,7 +50,9 @@ export class ActivityMessagesService {
       this.prisma.activityMessage.findMany({
         where: { activity_id: activityId },
         include: {
-          author: { select: { id: true, full_name: true, profile_picture_url: true } },
+          author: {
+            select: { id: true, full_name: true, profile_picture_url: true },
+          },
         },
         orderBy: [{ is_pinned: 'desc' }, { created_at: 'asc' }],
         skip,
@@ -57,18 +70,29 @@ export class ActivityMessagesService {
     };
   }
 
-  async createMessage(activityId: string, user: AuthenticatedUser, dto: CreateActivityMessageDto) {
+  async createMessage(
+    activityId: string,
+    user: AuthenticatedUser,
+    dto: CreateActivityMessageDto,
+  ) {
     const supabaseUserId = this.requireSupabaseUserId(user);
     const profile = await this.getProfileForUser(supabaseUserId);
-    const activity = await this.assertCanAccessActivity(activityId, supabaseUserId, profile.id);
+    const activity = await this.assertCanAccessActivity(
+      activityId,
+      supabaseUserId,
+      profile.id,
+    );
     const isHost = activity.host_id === supabaseUserId;
 
-    const wantsAnnouncement = dto.messageType === 'announcement' || Boolean(dto.isPinned);
+    const wantsAnnouncement =
+      dto.messageType === 'announcement' || Boolean(dto.isPinned);
     if (wantsAnnouncement && !isHost) {
       throw new ForbiddenException('Only the host can post announcements');
     }
 
-    const messageType: activity_message_type = wantsAnnouncement ? 'announcement' : 'user';
+    const messageType: activity_message_type = wantsAnnouncement
+      ? 'announcement'
+      : 'user';
 
     const message = await this.prisma.activityMessage.create({
       data: {
@@ -79,13 +103,19 @@ export class ActivityMessagesService {
         is_pinned: dto.isPinned ?? false,
       },
       include: {
-        author: { select: { id: true, full_name: true, profile_picture_url: true } },
+        author: {
+          select: { id: true, full_name: true, profile_picture_url: true },
+        },
       },
     });
 
     if (dto.isPinned) {
       await this.prisma.activityMessage.updateMany({
-        where: { activity_id: activityId, id: { not: message.id }, is_pinned: true },
+        where: {
+          activity_id: activityId,
+          id: { not: message.id },
+          is_pinned: true,
+        },
         data: { is_pinned: false },
       });
     }
@@ -101,7 +131,11 @@ export class ActivityMessagesService {
   ) {
     const supabaseUserId = this.requireSupabaseUserId(user);
     const profile = await this.getProfileForUser(supabaseUserId);
-    const activity = await this.assertCanAccessActivity(activityId, supabaseUserId, profile.id);
+    const activity = await this.assertCanAccessActivity(
+      activityId,
+      supabaseUserId,
+      profile.id,
+    );
     const isHost = activity.host_id === supabaseUserId;
 
     if (!isHost) {
@@ -119,7 +153,11 @@ export class ActivityMessagesService {
     return this.prisma.$transaction(async (tx) => {
       if (dto.isPinned) {
         await tx.activityMessage.updateMany({
-          where: { activity_id: activityId, id: { not: messageId }, is_pinned: true },
+          where: {
+            activity_id: activityId,
+            id: { not: messageId },
+            is_pinned: true,
+          },
           data: { is_pinned: false },
         });
       }
@@ -131,7 +169,9 @@ export class ActivityMessagesService {
           message_type: dto.isPinned ? 'announcement' : message.message_type,
         },
         include: {
-          author: { select: { id: true, full_name: true, profile_picture_url: true } },
+          author: {
+            select: { id: true, full_name: true, profile_picture_url: true },
+          },
         },
       });
 
@@ -168,7 +208,10 @@ export class ActivityMessagesService {
         },
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new BadRequestException('You have already reported this message');
       }
       throw error;
@@ -190,7 +233,9 @@ export class ActivityMessagesService {
         metadata: (metadata ?? {}) as Prisma.InputJsonValue,
       },
       include: {
-        author: { select: { id: true, full_name: true, profile_picture_url: true } },
+        author: {
+          select: { id: true, full_name: true, profile_picture_url: true },
+        },
       },
     });
 
@@ -203,12 +248,18 @@ export class ActivityMessagesService {
       select: { id: true },
     });
     if (!profile) {
-      throw new BadRequestException('Complete your profile before sending messages');
+      throw new BadRequestException(
+        'Complete your profile before sending messages',
+      );
     }
     return profile;
   }
 
-  private async assertCanAccessActivity(activityId: string, supabaseUserId: string, profileId: string) {
+  private async assertCanAccessActivity(
+    activityId: string,
+    supabaseUserId: string,
+    profileId: string,
+  ) {
     const activity = await this.prisma.activity.findUnique({
       where: { id: activityId },
       select: { id: true, host_id: true },
@@ -232,7 +283,9 @@ export class ActivityMessagesService {
     });
 
     if (!participant || participant.status === 'cancelled') {
-      throw new ForbiddenException('You are not a participant in this activity');
+      throw new ForbiddenException(
+        'You are not a participant in this activity',
+      );
     }
 
     return activity;
@@ -240,14 +293,20 @@ export class ActivityMessagesService {
 
   private requireSupabaseUserId(user: AuthenticatedUser): string {
     if (!user?.supabaseUserId) {
-      throw new BadRequestException('supabaseUserId missing from authenticated request');
+      throw new BadRequestException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
     return user.supabaseUserId;
   }
 
   private mapMessage(
     message: Prisma.ActivityMessageGetPayload<{
-      include: { author: { select: { id: true; full_name: true; profile_picture_url: true } } };
+      include: {
+        author: {
+          select: { id: true; full_name: true; profile_picture_url: true };
+        };
+      };
     }>,
   ): ActivityMessageSummary {
     return {
@@ -265,4 +324,3 @@ export class ActivityMessagesService {
     };
   }
 }
-

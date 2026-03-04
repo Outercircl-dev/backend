@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  Prisma,
+import { Prisma } from 'src/generated/prisma/client';
+import type {
+  notification_channel,
+  notification_delivery_status,
+  notification_type,
 } from 'src/generated/prisma/client';
-import type { notification_channel, notification_delivery_status, notification_type } from 'src/generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { NotificationEmailService } from './providers/email.service';
@@ -35,16 +37,26 @@ export interface CreateNotificationInput {
 
 @Injectable()
 export class NotificationsService {
-  private readonly logger = new Logger(NotificationsService.name, { timestamp: true });
+  private readonly logger = new Logger(NotificationsService.name, {
+    timestamp: true,
+  });
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationEmailService: NotificationEmailService,
   ) {}
 
-  async listForUser(userId: string, page = DEFAULT_PAGE, limit = DEFAULT_LIMIT) {
-    const normalizedPage = Number.isFinite(page) ? Math.max(1, page) : DEFAULT_PAGE;
-    const normalizedLimit = Number.isFinite(limit) ? Math.min(Math.max(1, limit), MAX_LIMIT) : DEFAULT_LIMIT;
+  async listForUser(
+    userId: string,
+    page = DEFAULT_PAGE,
+    limit = DEFAULT_LIMIT,
+  ) {
+    const normalizedPage = Number.isFinite(page)
+      ? Math.max(1, page)
+      : DEFAULT_PAGE;
+    const normalizedLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(1, limit), MAX_LIMIT)
+      : DEFAULT_LIMIT;
     const skip = (normalizedPage - 1) * normalizedLimit;
 
     const [items, total] = await Promise.all([
@@ -129,7 +141,10 @@ export class NotificationsService {
     return this.mapPreferences(preference);
   }
 
-  async updatePreferences(userId: string, dto: UpdateNotificationPreferencesDto) {
+  async updatePreferences(
+    userId: string,
+    dto: UpdateNotificationPreferencesDto,
+  ) {
     const updated = await this.prisma.notificationPreference.upsert({
       where: { user_id: userId },
       create: {
@@ -156,10 +171,18 @@ export class NotificationsService {
         ...(dto.timeLocationChangeAlerts !== undefined
           ? { time_location_change_alerts: dto.timeLocationChangeAlerts }
           : {}),
-        ...(dto.safetyAlerts !== undefined ? { safety_alerts: dto.safetyAlerts } : {}),
-        ...(dto.channelInApp !== undefined ? { channel_in_app: dto.channelInApp } : {}),
-        ...(dto.channelEmail !== undefined ? { channel_email: dto.channelEmail } : {}),
-        ...(dto.channelBrowser !== undefined ? { channel_browser: dto.channelBrowser } : {}),
+        ...(dto.safetyAlerts !== undefined
+          ? { safety_alerts: dto.safetyAlerts }
+          : {}),
+        ...(dto.channelInApp !== undefined
+          ? { channel_in_app: dto.channelInApp }
+          : {}),
+        ...(dto.channelEmail !== undefined
+          ? { channel_email: dto.channelEmail }
+          : {}),
+        ...(dto.channelBrowser !== undefined
+          ? { channel_browser: dto.channelBrowser }
+          : {}),
       },
     });
 
@@ -172,9 +195,12 @@ export class NotificationsService {
       return null;
     }
 
-    const deliverInApp = preference.channel_in_app && (input.channels?.inApp ?? true);
-    const deliverEmail = preference.channel_email && (input.channels?.email ?? true);
-    const deliverBrowser = preference.channel_browser && (input.channels?.browser ?? true);
+    const deliverInApp =
+      preference.channel_in_app && (input.channels?.inApp ?? true);
+    const deliverEmail =
+      preference.channel_email && (input.channels?.email ?? true);
+    const deliverBrowser =
+      preference.channel_browser && (input.channels?.browser ?? true);
 
     if (!deliverInApp && !deliverEmail && !deliverBrowser) {
       return null;
@@ -212,11 +238,12 @@ export class NotificationsService {
     }
 
     if (deliverEmail) {
-      const emailResult = await this.notificationEmailService.sendNotificationEmail(
-        input.recipientUserId,
-        input.title,
-        input.body,
-      );
+      const emailResult =
+        await this.notificationEmailService.sendNotificationEmail(
+          input.recipientUserId,
+          input.title,
+          input.body,
+        );
 
       if (emailResult.status === 'sent') {
         await this.updateDeliveryStatus(notification.id, 'email', 'sent', {
@@ -243,7 +270,10 @@ export class NotificationsService {
   ): Promise<number> {
     let createdCount = 0;
     for (const recipientUserId of recipientUserIds) {
-      const created = await this.createNotification({ ...input, recipientUserId });
+      const created = await this.createNotification({
+        ...input,
+        recipientUserId,
+      });
       if (created) {
         createdCount += 1;
       }
@@ -292,11 +322,17 @@ export class NotificationsService {
     let createdCount = 0;
 
     for (const activity of activities) {
-      const startsAt = this.buildActivityStart(activity.activity_date, activity.start_time);
-      const minutesUntilStart = Math.round((startsAt.getTime() - now.getTime()) / 60_000);
+      const startsAt = this.buildActivityStart(
+        activity.activity_date,
+        activity.start_time,
+      );
+      const minutesUntilStart = Math.round(
+        (startsAt.getTime() - now.getTime()) / 60_000,
+      );
       const shouldNotify =
         (minutesUntilStart >= 55 && minutesUntilStart <= 65) ||
-        (minutesUntilStart >= 23 * 60 + 30 && minutesUntilStart <= 24 * 60 + 30);
+        (minutesUntilStart >= 23 * 60 + 30 &&
+          minutesUntilStart <= 24 * 60 + 30);
 
       if (!shouldNotify) {
         continue;
@@ -333,7 +369,9 @@ export class NotificationsService {
     }
 
     if (createdCount > 0) {
-      this.logger.log(`Created ${createdCount} upcoming activity reminder notifications`);
+      this.logger.log(
+        `Created ${createdCount} upcoming activity reminder notifications`,
+      );
     }
     return createdCount;
   }
@@ -377,25 +415,28 @@ export class NotificationsService {
           return false;
         }
         const activityInterests = this.toStringArray(activity.interests);
-        return activityInterests.some((interest) => userInterests.includes(interest));
+        return activityInterests.some((interest) =>
+          userInterests.includes(interest),
+        );
       });
 
       if (!matched) {
         continue;
       }
 
-      const isAlreadyParticipant = await this.prisma.activityParticipant.findFirst({
-        where: {
-          activity_id: matched.id,
-          profile: {
-            user_id: profile.user_id,
+      const isAlreadyParticipant =
+        await this.prisma.activityParticipant.findFirst({
+          where: {
+            activity_id: matched.id,
+            profile: {
+              user_id: profile.user_id,
+            },
+            status: {
+              in: ['pending', 'confirmed', 'waitlisted'],
+            },
           },
-          status: {
-            in: ['pending', 'confirmed', 'waitlisted'],
-          },
-        },
-        select: { id: true },
-      });
+          select: { id: true },
+        });
       if (isAlreadyParticipant) {
         continue;
       }
@@ -453,7 +494,11 @@ export class NotificationsService {
 
   private async createDeliveryRecords(
     notificationId: string,
-    channels: { deliverInApp: boolean; deliverEmail: boolean; deliverBrowser: boolean },
+    channels: {
+      deliverInApp: boolean;
+      deliverEmail: boolean;
+      deliverBrowser: boolean;
+    },
   ) {
     const rows: Prisma.NotificationDeliveryCreateManyInput[] = [];
     if (channels.deliverInApp) {
@@ -480,7 +525,10 @@ export class NotificationsService {
     if (rows.length === 0) {
       return;
     }
-    await this.prisma.notificationDelivery.createMany({ data: rows, skipDuplicates: true });
+    await this.prisma.notificationDelivery.createMany({
+      data: rows,
+      skipDuplicates: true,
+    });
   }
 
   private async updateDeliveryStatus(
@@ -521,7 +569,9 @@ export class NotificationsService {
     return preference[key];
   }
 
-  private preferenceFlagForType(type: notification_type): NotificationPreferenceFlag {
+  private preferenceFlagForType(
+    type: notification_type,
+  ): NotificationPreferenceFlag {
     if (type === 'recommendation_match') {
       return 'recommended_activities';
     }
@@ -531,7 +581,10 @@ export class NotificationsService {
     if (type === 'participant_joined' || type === 'participant_cancelled') {
       return 'host_join_cancel_updates';
     }
-    if (type === 'activity_time_changed' || type === 'activity_location_changed') {
+    if (
+      type === 'activity_time_changed' ||
+      type === 'activity_location_changed'
+    ) {
       return 'time_location_change_alerts';
     }
     return 'safety_alerts';
@@ -595,14 +648,27 @@ export class NotificationsService {
     };
   }
 
-  private buildActivityStart(activityDate: Date, startTime: Date | string): Date {
+  private buildActivityStart(
+    activityDate: Date,
+    startTime: Date | string,
+  ): Date {
     const date = new Date(activityDate);
     if (typeof startTime === 'string') {
       const [hours, minutes, seconds = '0'] = startTime.split(':');
-      date.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
+      date.setHours(
+        parseInt(hours, 10),
+        parseInt(minutes, 10),
+        parseInt(seconds, 10),
+        0,
+      );
       return date;
     }
-    date.setHours(startTime.getHours(), startTime.getMinutes(), startTime.getSeconds(), 0);
+    date.setHours(
+      startTime.getHours(),
+      startTime.getMinutes(),
+      startTime.getSeconds(),
+      0,
+    );
     return date;
   }
 
@@ -613,4 +679,3 @@ export class NotificationsService {
     return value.filter((item): item is string => typeof item === 'string');
   }
 }
-

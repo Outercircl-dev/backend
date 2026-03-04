@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { SupabaseAuthGuard } from 'src/auth/supabase-auth.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request.interface';
 import { ActivitiesService } from '../activities.service';
@@ -22,11 +33,20 @@ export class ParticipantsController {
   ) {
     const supabaseUserId = req.user?.supabaseUserId;
     if (!supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
 
-    const participation = await this.participantsService.join(activityId, supabaseUserId, body);
-    const activity = await this.activitiesService.findOne(activityId, supabaseUserId);
+    const participation = await this.participantsService.join(
+      activityId,
+      supabaseUserId,
+      body,
+    );
+    const activity = await this.activitiesService.findOne(
+      activityId,
+      supabaseUserId,
+    );
     return { participation, activity };
   }
 
@@ -38,7 +58,9 @@ export class ParticipantsController {
   ) {
     const supabaseUserId = req.user?.supabaseUserId;
     if (!supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
 
     const participation = await this.participantsService.cancelParticipation(
@@ -46,7 +68,10 @@ export class ParticipantsController {
       participantId,
       supabaseUserId,
     );
-    const activity = await this.activitiesService.findOne(activityId, supabaseUserId);
+    const activity = await this.activitiesService.findOne(
+      activityId,
+      supabaseUserId,
+    );
     return { participation, activity };
   }
 
@@ -59,7 +84,9 @@ export class ParticipantsController {
   ) {
     const supabaseUserId = req.user?.supabaseUserId;
     if (!supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
 
     const participation = await this.participantsService.moderateParticipant(
@@ -68,19 +95,29 @@ export class ParticipantsController {
       supabaseUserId,
       body,
     );
-    const activity = await this.activitiesService.findOne(activityId, supabaseUserId);
+    const activity = await this.activitiesService.findOne(
+      activityId,
+      supabaseUserId,
+    );
     return { participation, activity };
   }
 
   @Get()
-  async list(@Req() req: AuthenticatedRequest, @Param('activityId') activityId: string) {
+  async list(
+    @Req() req: AuthenticatedRequest,
+    @Param('activityId') activityId: string,
+  ) {
     const supabaseUserId = req.user?.supabaseUserId;
     if (!supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
 
-    const participants = await this.participantsService.listParticipants(activityId, supabaseUserId);
+    const participants = await this.participantsService.listParticipants(
+      activityId,
+      supabaseUserId,
+    );
     return { participants };
   }
 }
-

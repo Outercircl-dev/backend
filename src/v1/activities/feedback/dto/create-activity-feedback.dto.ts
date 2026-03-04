@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, Max, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  Max,
+  ValidateNested,
+} from 'class-validator';
 import { ParticipantRatingDto } from './participant-rating.dto';
 
 export class CreateActivityFeedbackDto {
@@ -22,4 +32,3 @@ export class CreateActivityFeedbackDto {
   @Type(() => ParticipantRatingDto)
   participantRatings?: ParticipantRatingDto[];
 }
-

@@ -15,4 +15,3 @@ export class NotificationQueryDto {
   @Max(100)
   limit?: number;
 }
-

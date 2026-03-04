@@ -2,11 +2,16 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import Stripe from 'stripe';
 import type { MembershipTierKey } from 'src/config/membership-tiers.model';
 import { MembershipTiersService } from 'src/config/membership-tiers.service';
-import { MembershipSubscriptionsService, SubscriptionStatus } from 'src/membership/membership-subscriptions.service';
+import {
+  MembershipSubscriptionsService,
+  SubscriptionStatus,
+} from 'src/membership/membership-subscriptions.service';
 
 @Injectable()
 export class BillingService {
-  private readonly logger = new Logger(BillingService.name, { timestamp: true });
+  private readonly logger = new Logger(BillingService.name, {
+    timestamp: true,
+  });
   private readonly stripe: Stripe;
   private readonly webhookSecret: string;
   private readonly premiumPriceId: string;
@@ -24,7 +29,14 @@ export class BillingService {
     const successPath = process.env.STRIPE_SUCCESS_PATH;
     const cancelPath = process.env.STRIPE_CANCEL_PATH;
 
-    if (!secretKey || !webhookSecret || !premiumPriceId || !frontendBaseUrl || !successPath || !cancelPath) {
+    if (
+      !secretKey ||
+      !webhookSecret ||
+      !premiumPriceId ||
+      !frontendBaseUrl ||
+      !successPath ||
+      !cancelPath
+    ) {
       throw new Error('Stripe configuration missing for billing module');
     }
 
@@ -37,10 +49,19 @@ export class BillingService {
     });
   }
 
-  async createCheckoutSession(userId: string, email: string, tier?: MembershipTierKey) {
-    const resolvedTier = tier ?? this.membershipTiersService.resolveTierKey('PREMIUM') ?? 'PREMIUM';
+  async createCheckoutSession(
+    userId: string,
+    email: string,
+    tier?: MembershipTierKey,
+  ) {
+    const resolvedTier =
+      tier ??
+      this.membershipTiersService.resolveTierKey('PREMIUM') ??
+      'PREMIUM';
     if (resolvedTier !== 'PREMIUM') {
-      throw new BadRequestException('Only Premium tier upgrades are supported right now.');
+      throw new BadRequestException(
+        'Only Premium tier upgrades are supported right now.',
+      );
     }
 
     const session = await this.stripe.checkout.sessions.create({
@@ -69,17 +90,21 @@ export class BillingService {
     if (!signature || Array.isArray(signature)) {
       throw new BadRequestException('Missing Stripe signature header');
     }
-    return this.stripe.webhooks.constructEvent(payload, signature, this.webhookSecret);
+    return this.stripe.webhooks.constructEvent(
+      payload,
+      signature,
+      this.webhookSecret,
+    );
   }
 
   async handleWebhook(event: Stripe.Event) {
     switch (event.type) {
       case 'checkout.session.completed':
-        await this.handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        await this.handleCheckoutCompleted(event.data.object);
         break;
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
-        await this.handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+        await this.handleSubscriptionUpdated(event.data.object);
         break;
       default:
         this.logger.debug(`Unhandled Stripe event type: ${event.type}`);
@@ -92,10 +117,13 @@ export class BillingService {
       return;
     }
 
-    const userId = session.client_reference_id ?? session.metadata?.user_id ?? undefined;
-    const subscriptionId = typeof session.subscription === 'string' ? session.subscription : null;
-    const customerId = typeof session.customer === 'string' ? session.customer : null;
-    const tier = (session.metadata?.tier ?? 'PREMIUM') as MembershipTierKey;
+    const userId =
+      session.client_reference_id ?? session.metadata?.user_id ?? undefined;
+    const subscriptionId =
+      typeof session.subscription === 'string' ? session.subscription : null;
+    const customerId =
+      typeof session.customer === 'string' ? session.customer : null;
+    const tier = session.metadata?.tier ?? 'PREMIUM';
 
     await this.subscriptionsService.upsertSubscription({
       userId: userId ?? undefined,
@@ -109,14 +137,17 @@ export class BillingService {
 
   private async handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     const userId = subscription.metadata?.user_id ?? undefined;
-    const tier = (subscription.metadata?.tier ?? 'PREMIUM') as MembershipTierKey;
+    const tier = subscription.metadata?.tier ?? 'PREMIUM';
     const status = subscription.status as SubscriptionStatus;
 
     await this.subscriptionsService.upsertSubscription({
       userId: userId ?? undefined,
       tier,
       status,
-      stripeCustomerId: typeof subscription.customer === 'string' ? subscription.customer : null,
+      stripeCustomerId:
+        typeof subscription.customer === 'string'
+          ? subscription.customer
+          : null,
       stripeSubscriptionId: subscription.id,
       stripePriceId: subscription.items.data[0]?.price?.id ?? null,
       currentPeriodStart: (subscription as any).current_period_start

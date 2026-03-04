@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user.interface';
 import { CreateActivityFeedbackDto } from './dto/create-activity-feedback.dto';
@@ -46,7 +52,9 @@ const LOW_RATING_REVIEW_COUNT = 3;
 
 @Injectable()
 export class ActivityFeedbackService {
-  private readonly logger = new Logger(ActivityFeedbackService.name, { timestamp: true });
+  private readonly logger = new Logger(ActivityFeedbackService.name, {
+    timestamp: true,
+  });
 
   constructor(
     private readonly prisma: PrismaService,
@@ -54,7 +62,10 @@ export class ActivityFeedbackService {
     private readonly membershipTiersService: MembershipTiersService,
   ) {}
 
-  async getFeedbackForm(activityId: string, user: AuthenticatedUser): Promise<FeedbackFormResponse> {
+  async getFeedbackForm(
+    activityId: string,
+    user: AuthenticatedUser,
+  ): Promise<FeedbackFormResponse> {
     const profile = await this.getProfileOrThrow(user.supabaseUserId);
     const activity = await this.getActivityOrThrow(activityId);
     const activityEnded = this.isActivityEnded(activity);
@@ -62,7 +73,10 @@ export class ActivityFeedbackService {
 
     const participant = await this.prisma.activityParticipant.findUnique({
       where: {
-        activity_id_profile_id: { activity_id: activityId, profile_id: profile.id },
+        activity_id_profile_id: {
+          activity_id: activityId,
+          profile_id: profile.id,
+        },
       },
       select: { status: true },
     });
@@ -76,7 +90,12 @@ export class ActivityFeedbackService {
         : undefined;
 
     const existingFeedback = await this.prisma.activityFeedback.findUnique({
-      where: { activity_id_author_profile_id: { activity_id: activityId, author_profile_id: profile.id } },
+      where: {
+        activity_id_author_profile_id: {
+          activity_id: activityId,
+          author_profile_id: profile.id,
+        },
+      },
       include: {
         ratings: {
           select: { target_profile_id: true, rating: true, comment: true },
@@ -85,9 +104,14 @@ export class ActivityFeedbackService {
     });
 
     const includeRatingSummary = await this.isPremiumMember(user);
-    const participants = isHost || hasConfirmedParticipation
-      ? await this.getParticipantsForRating(activity, profile.id, includeRatingSummary)
-      : [];
+    const participants =
+      isHost || hasConfirmedParticipation
+        ? await this.getParticipantsForRating(
+            activity,
+            profile.id,
+            includeRatingSummary,
+          )
+        : [];
 
     return {
       activityId,
@@ -121,19 +145,26 @@ export class ActivityFeedbackService {
     const activityEnded = this.isActivityEnded(activity);
 
     if (!activityEnded) {
-      throw new ForbiddenException('Feedback can only be submitted after the activity ends');
+      throw new ForbiddenException(
+        'Feedback can only be submitted after the activity ends',
+      );
     }
 
     const isHost = activity.host_id === user.supabaseUserId;
     const participant = await this.prisma.activityParticipant.findUnique({
       where: {
-        activity_id_profile_id: { activity_id: activityId, profile_id: profile.id },
+        activity_id_profile_id: {
+          activity_id: activityId,
+          profile_id: profile.id,
+        },
       },
       select: { status: true },
     });
 
     if (!isHost && participant?.status !== 'confirmed') {
-      throw new ForbiddenException('Only confirmed participants can leave feedback');
+      throw new ForbiddenException(
+        'Only confirmed participants can leave feedback',
+      );
     }
 
     if (!dto.consentToAnalysis) {
@@ -141,7 +172,12 @@ export class ActivityFeedbackService {
     }
 
     const existing = await this.prisma.activityFeedback.findUnique({
-      where: { activity_id_author_profile_id: { activity_id: activityId, author_profile_id: profile.id } },
+      where: {
+        activity_id_author_profile_id: {
+          activity_id: activityId,
+          author_profile_id: profile.id,
+        },
+      },
       select: { id: true },
     });
 
@@ -149,7 +185,9 @@ export class ActivityFeedbackService {
       throw new BadRequestException('Feedback has already been submitted');
     }
 
-    const participantRatings = this.normalizeParticipantRatings(dto.participantRatings);
+    const participantRatings = this.normalizeParticipantRatings(
+      dto.participantRatings,
+    );
     const validTargets = await this.getValidRatingTargets(activity, profile.id);
 
     for (const rating of participantRatings) {
@@ -157,7 +195,9 @@ export class ActivityFeedbackService {
         throw new BadRequestException('You cannot rate yourself');
       }
       if (!validTargets.has(rating.profileId)) {
-        throw new BadRequestException('Ratings must target participants in this activity');
+        throw new BadRequestException(
+          'Ratings must target participants in this activity',
+        );
       }
     }
 
@@ -177,7 +217,11 @@ export class ActivityFeedbackService {
       }
 
       const lowRatingTargets = Array.from(
-        new Set(participantRatings.filter((item) => item.rating <= LOW_RATING_THRESHOLD).map((item) => item.profileId)),
+        new Set(
+          participantRatings
+            .filter((item) => item.rating <= LOW_RATING_THRESHOLD)
+            .map((item) => item.profileId),
+        ),
       );
 
       const createRows = participantRatings.map((item) => ({
@@ -233,7 +277,9 @@ export class ActivityFeedbackService {
     viewer: AuthenticatedUser,
   ): Promise<UserRatingSummary> {
     if (!(await this.isPremiumMember(viewer))) {
-      throw new ForbiddenException('Only premium members can view user ratings');
+      throw new ForbiddenException(
+        'Only premium members can view user ratings',
+      );
     }
 
     const activity = await this.getActivityOrThrow(activityId);
@@ -250,11 +296,18 @@ export class ActivityFeedbackService {
 
     const profile = await this.prisma.user_profiles.findUnique({
       where: { user_id: supabaseUserId },
-      select: { id: true, user_id: true, full_name: true, profile_picture_url: true },
+      select: {
+        id: true,
+        user_id: true,
+        full_name: true,
+        profile_picture_url: true,
+      },
     });
 
     if (!profile) {
-      throw new BadRequestException('Complete your profile before leaving feedback');
+      throw new BadRequestException(
+        'Complete your profile before leaving feedback',
+      );
     }
 
     return profile;
@@ -291,25 +344,40 @@ export class ActivityFeedbackService {
         where: { activity_id: activity.id, status: 'confirmed' },
         include: {
           profile: {
-            select: { id: true, user_id: true, full_name: true, profile_picture_url: true },
+            select: {
+              id: true,
+              user_id: true,
+              full_name: true,
+              profile_picture_url: true,
+            },
           },
         },
       }),
       this.prisma.user_profiles.findUnique({
         where: { user_id: activity.host_id },
-        select: { id: true, user_id: true, full_name: true, profile_picture_url: true },
+        select: {
+          id: true,
+          user_id: true,
+          full_name: true,
+          profile_picture_url: true,
+        },
       }),
     ]);
 
-    const summaries: FeedbackParticipantSummary[] = participants.map((participant) => ({
-      profileId: participant.profile.id,
-      supabaseUserId: participant.profile.user_id,
-      fullName: participant.profile.full_name,
-      avatarUrl: participant.profile.profile_picture_url,
-      isHost: participant.profile.user_id === activity.host_id,
-    }));
+    const summaries: FeedbackParticipantSummary[] = participants.map(
+      (participant) => ({
+        profileId: participant.profile.id,
+        supabaseUserId: participant.profile.user_id,
+        fullName: participant.profile.full_name,
+        avatarUrl: participant.profile.profile_picture_url,
+        isHost: participant.profile.user_id === activity.host_id,
+      }),
+    );
 
-    if (hostProfile && !summaries.some((item) => item.profileId === hostProfile.id)) {
+    if (
+      hostProfile &&
+      !summaries.some((item) => item.profileId === hostProfile.id)
+    ) {
       summaries.push({
         profileId: hostProfile.id,
         supabaseUserId: hostProfile.user_id,
@@ -319,7 +387,9 @@ export class ActivityFeedbackService {
       });
     }
 
-    const filtered = summaries.filter((participant) => participant.profileId !== viewerProfileId);
+    const filtered = summaries.filter(
+      (participant) => participant.profileId !== viewerProfileId,
+    );
 
     if (!includeRatingSummary) {
       return filtered;
@@ -328,7 +398,9 @@ export class ActivityFeedbackService {
     const summariesWithRatings = await Promise.all(
       filtered.map(async (participant) => ({
         ...participant,
-        ratingSummary: await this.computeUserRatingSummary(participant.profileId),
+        ratingSummary: await this.computeUserRatingSummary(
+          participant.profileId,
+        ),
       })),
     );
 
@@ -339,17 +411,28 @@ export class ActivityFeedbackService {
     if (!user.supabaseUserId) {
       return false;
     }
-    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
-    return this.membershipTiersService.getTierClass(tierKey)?.toLowerCase() === 'premium';
+    const tierKey =
+      await this.membershipSubscriptionsService.resolveTierForUserId(
+        user.supabaseUserId,
+      );
+    return (
+      this.membershipTiersService.getTierClass(tierKey)?.toLowerCase() ===
+      'premium'
+    );
   }
 
-  private async getValidRatingTargets(activity: { id: string; host_id: string }, viewerProfileId: string) {
+  private async getValidRatingTargets(
+    activity: { id: string; host_id: string },
+    viewerProfileId: string,
+  ) {
     const participants = await this.prisma.activityParticipant.findMany({
       where: { activity_id: activity.id, status: 'confirmed' },
       select: { profile_id: true },
     });
 
-    const validTargets = new Set(participants.map((participant) => participant.profile_id));
+    const validTargets = new Set(
+      participants.map((participant) => participant.profile_id),
+    );
 
     const hostProfile = await this.prisma.user_profiles.findUnique({
       where: { user_id: activity.host_id },
@@ -364,12 +447,17 @@ export class ActivityFeedbackService {
     return validTargets;
   }
 
-  private normalizeParticipantRatings(input?: CreateActivityFeedbackDto['participantRatings']) {
+  private normalizeParticipantRatings(
+    input?: CreateActivityFeedbackDto['participantRatings'],
+  ) {
     if (!input || input.length === 0) {
       return [];
     }
 
-    const deduped = new Map<string, { profileId: string; rating: number; comment: string | null }>();
+    const deduped = new Map<
+      string,
+      { profileId: string; rating: number; comment: string | null }
+    >();
     for (const item of input) {
       const normalizedComment = this.normalizeComment(item.comment);
       deduped.set(item.profileId, {
@@ -404,12 +492,18 @@ export class ActivityFeedbackService {
     return Date.now() >= endDateTime.getTime();
   }
 
-  private buildActivityDateTime(activityDate: Date, time: Date | string, timezoneName?: string): Date {
+  private buildActivityDateTime(
+    activityDate: Date,
+    time: Date | string,
+    timezoneName?: string,
+  ): Date {
     const { hours, minutes, seconds } = this.parseActivityTime(time);
     const year = activityDate.getUTCFullYear();
     const month = activityDate.getUTCMonth();
     const day = activityDate.getUTCDate();
-    const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds, 0));
+    const utcDate = new Date(
+      Date.UTC(year, month, day, hours, minutes, seconds, 0),
+    );
 
     if (!timezoneName) {
       return utcDate;
@@ -418,10 +512,16 @@ export class ActivityFeedbackService {
     return this.applyTimeZoneOffset(utcDate, timezoneName);
   }
 
-  private parseActivityTime(time: Date | string): { hours: number; minutes: number; seconds: number } {
+  private parseActivityTime(time: Date | string): {
+    hours: number;
+    minutes: number;
+    seconds: number;
+  } {
     if (typeof time !== 'string') {
       if (Number.isNaN(time.getTime())) {
-        this.logger.warn('Invalid time value received for activity time; defaulting to 00:00:00');
+        this.logger.warn(
+          'Invalid time value received for activity time; defaulting to 00:00:00',
+        );
         return { hours: 0, minutes: 0, seconds: 0 };
       }
       return {
@@ -434,7 +534,9 @@ export class ActivityFeedbackService {
     const trimmed = time.trim();
     const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
     if (!match) {
-      this.logger.warn(`Invalid time string "${time}" for activity time; defaulting to 00:00:00`);
+      this.logger.warn(
+        `Invalid time string "${time}" for activity time; defaulting to 00:00:00`,
+      );
       return { hours: 0, minutes: 0, seconds: 0 };
     }
 
@@ -453,7 +555,9 @@ export class ActivityFeedbackService {
       seconds < 0 ||
       seconds > 59
     ) {
-      this.logger.warn(`Out-of-range time string "${time}" for activity time; defaulting to 00:00:00`);
+      this.logger.warn(
+        `Out-of-range time string "${time}" for activity time; defaulting to 00:00:00`,
+      );
       return { hours: 0, minutes: 0, seconds: 0 };
     }
 
@@ -474,7 +578,8 @@ export class ActivityFeedbackService {
       });
 
       const parts = formatter.formatToParts(utcDate);
-      const lookup = (type: string) => parts.find((part) => part.type === type)?.value ?? '0';
+      const lookup = (type: string) =>
+        parts.find((part) => part.type === type)?.value ?? '0';
       const zonedYear = Number(lookup('year'));
       const zonedMonth = Number(lookup('month')) - 1;
       const zonedDay = Number(lookup('day'));
@@ -482,17 +587,29 @@ export class ActivityFeedbackService {
       const zonedMinute = Number(lookup('minute'));
       const zonedSecond = Number(lookup('second'));
 
-      const zonedAsUtc = Date.UTC(zonedYear, zonedMonth, zonedDay, zonedHour, zonedMinute, zonedSecond);
+      const zonedAsUtc = Date.UTC(
+        zonedYear,
+        zonedMonth,
+        zonedDay,
+        zonedHour,
+        zonedMinute,
+        zonedSecond,
+      );
       const offsetMs = zonedAsUtc - utcDate.getTime();
 
       return new Date(utcDate.getTime() - offsetMs);
     } catch (error) {
-      this.logger.warn(`Failed to apply timezone ${timezoneName}; falling back to UTC time`, error as Error);
+      this.logger.warn(
+        `Failed to apply timezone ${timezoneName}; falling back to UTC time`,
+        error as Error,
+      );
       return utcDate;
     }
   }
 
-  private async computeUserRatingSummary(profileId: string): Promise<UserRatingSummary> {
+  private async computeUserRatingSummary(
+    profileId: string,
+  ): Promise<UserRatingSummary> {
     const recentActivities = await this.prisma.activityParticipant.findMany({
       where: { profile_id: profileId, status: 'confirmed' },
       select: { activity_id: true },
@@ -511,7 +628,11 @@ export class ActivityFeedbackService {
     });
 
     if (ratings.length === 0) {
-      return { averageRating: null, ratingsCount: 0, activityCount: activityIds.length };
+      return {
+        averageRating: null,
+        ratingsCount: 0,
+        activityCount: activityIds.length,
+      };
     }
 
     const total = ratings.reduce((sum, item) => sum + item.rating, 0);
@@ -524,7 +645,10 @@ export class ActivityFeedbackService {
     };
   }
 
-  private async assertViewerInActivity(activityId: string, supabaseUserId?: string | null) {
+  private async assertViewerInActivity(
+    activityId: string,
+    supabaseUserId?: string | null,
+  ) {
     if (!supabaseUserId) {
       throw new ForbiddenException('Missing user identifier');
     }
@@ -550,7 +674,10 @@ export class ActivityFeedbackService {
 
     const participant = await this.prisma.activityParticipant.findUnique({
       where: {
-        activity_id_profile_id: { activity_id: activityId, profile_id: profile.id },
+        activity_id_profile_id: {
+          activity_id: activityId,
+          profile_id: profile.id,
+        },
       },
       select: { id: true },
     });
@@ -575,7 +702,10 @@ export class ActivityFeedbackService {
 
     const participant = await this.prisma.activityParticipant.findUnique({
       where: {
-        activity_id_profile_id: { activity_id: activity.id, profile_id: targetProfileId },
+        activity_id_profile_id: {
+          activity_id: activity.id,
+          profile_id: targetProfileId,
+        },
       },
       select: { id: true },
     });
@@ -585,4 +715,3 @@ export class ActivityFeedbackService {
     }
   }
 }
-

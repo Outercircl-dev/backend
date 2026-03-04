@@ -3,7 +3,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class SupabaseAdminService {
-  private readonly logger = new Logger(SupabaseAdminService.name, { timestamp: true });
+  private readonly logger = new Logger(SupabaseAdminService.name, {
+    timestamp: true,
+  });
   private readonly client: SupabaseClient;
 
   constructor() {
@@ -11,7 +13,9 @@ export class SupabaseAdminService {
     const serviceKey = process.env.SUPABASE_SECRET_KEY;
 
     if (!projectRef || !serviceKey) {
-      throw new Error('Supabase admin configuration missing for membership sync');
+      throw new Error(
+        'Supabase admin configuration missing for membership sync',
+      );
     }
 
     const supabaseUrl = `https://${projectRef}.supabase.co`;
@@ -21,9 +25,12 @@ export class SupabaseAdminService {
   }
 
   async updateSubscriptionTier(userId: string, tier: string): Promise<void> {
-    const { data: existing, error: fetchError } = await this.client.auth.admin.getUserById(userId);
+    const { data: existing, error: fetchError } =
+      await this.client.auth.admin.getUserById(userId);
     if (fetchError) {
-      this.logger.error(`Supabase admin getUserById failed: ${fetchError.message}`);
+      this.logger.error(
+        `Supabase admin getUserById failed: ${fetchError.message}`,
+      );
       throw fetchError;
     }
 
@@ -38,7 +45,9 @@ export class SupabaseAdminService {
     });
 
     if (error) {
-      this.logger.error(`Supabase admin updateUserById failed: ${error.message}`);
+      this.logger.error(
+        `Supabase admin updateUserById failed: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -46,7 +55,9 @@ export class SupabaseAdminService {
   async getUserEmailById(userId: string): Promise<string | null> {
     const { data, error } = await this.client.auth.admin.getUserById(userId);
     if (error) {
-      this.logger.warn(`Supabase admin getUserById (email lookup) failed: ${error.message}`);
+      this.logger.warn(
+        `Supabase admin getUserById (email lookup) failed: ${error.message}`,
+      );
       return null;
     }
     return data?.user?.email ?? null;

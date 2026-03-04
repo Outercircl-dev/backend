@@ -1,4 +1,11 @@
-import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateActivityGroupDto {
   @IsString()
@@ -18,6 +25,4 @@ export class CreateActivityGroupDto {
   @IsInt()
   @Min(2)
   maxMembers?: number;
-
 }
-

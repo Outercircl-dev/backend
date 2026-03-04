@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, participation_status } from 'src/generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityNotificationsService } from '../activity-notifications.service';
@@ -28,14 +34,20 @@ const PARTICIPANT_STATUS_ORDER: Record<participation_status, number> = {
 
 @Injectable()
 export class ParticipantsService {
-  private readonly logger = new Logger(ParticipantsService.name, { timestamp: true });
+  private readonly logger = new Logger(ParticipantsService.name, {
+    timestamp: true,
+  });
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: ActivityNotificationsService,
   ) {}
 
-  async join(activityId: string, supabaseUserId: string, dto: JoinActivityDto): Promise<ParticipantSummaryDto> {
+  async join(
+    activityId: string,
+    supabaseUserId: string,
+    dto: JoinActivityDto,
+  ): Promise<ParticipantSummaryDto> {
     const profile = await this.getProfileOrThrow(supabaseUserId);
 
     return this.prisma.$transaction(async (tx) => {
@@ -52,7 +64,9 @@ export class ParticipantsService {
       }
 
       if (activity.status !== 'published') {
-        throw new BadRequestException('Activity is not accepting new participants');
+        throw new BadRequestException(
+          'Activity is not accepting new participants',
+        );
       }
       if (this.hasActivityStarted(activity)) {
         throw new BadRequestException(
@@ -70,12 +84,18 @@ export class ParticipantsService {
       });
 
       if (existing && existing.status !== 'cancelled') {
-        throw new BadRequestException('You have already joined or requested to join this activity');
+        throw new BadRequestException(
+          'You have already joined or requested to join this activity',
+        );
       }
 
       const [confirmedCount, waitlistedCount] = await Promise.all([
-        tx.activityParticipant.count({ where: { activity_id: activityId, status: 'confirmed' } }),
-        tx.activityParticipant.count({ where: { activity_id: activityId, status: 'waitlisted' } }),
+        tx.activityParticipant.count({
+          where: { activity_id: activityId, status: 'confirmed' },
+        }),
+        tx.activityParticipant.count({
+          where: { activity_id: activityId, status: 'waitlisted' },
+        }),
       ]);
 
       let status: participation_status = 'confirmed';
@@ -111,19 +131,32 @@ export class ParticipantsService {
             },
           });
 
-      await this.emitJoinNotification(activityId, participant.id, supabaseUserId, status, waitlistPosition);
+      await this.emitJoinNotification(
+        activityId,
+        participant.id,
+        supabaseUserId,
+        status,
+        waitlistPosition,
+      );
 
       const hydrated = await tx.activityParticipant.findUnique({
         where: { id: participant.id },
         include: {
           profile: {
-            select: { id: true, user_id: true, full_name: true, profile_picture_url: true },
+            select: {
+              id: true,
+              user_id: true,
+              full_name: true,
+              profile_picture_url: true,
+            },
           },
         },
       });
 
       if (!hydrated) {
-        throw new NotFoundException('Participation record could not be hydrated');
+        throw new NotFoundException(
+          'Participation record could not be hydrated',
+        );
       }
 
       return this.mapParticipantSummary(hydrated);
@@ -141,7 +174,12 @@ export class ParticipantsService {
         include: {
           activity: true,
           profile: {
-            select: { id: true, user_id: true, full_name: true, profile_picture_url: true },
+            select: {
+              id: true,
+              user_id: true,
+              full_name: true,
+              profile_picture_url: true,
+            },
           },
         },
       });
@@ -154,7 +192,9 @@ export class ParticipantsService {
       const isHost = participant.activity.host_id === supabaseUserId;
 
       if (!isSelf && !isHost) {
-        throw new ForbiddenException('You do not have permission to cancel this participation');
+        throw new ForbiddenException(
+          'You do not have permission to cancel this participation',
+        );
       }
 
       if (participant.status === 'cancelled') {
@@ -204,7 +244,12 @@ export class ParticipantsService {
         include: {
           activity: true,
           profile: {
-            select: { id: true, user_id: true, full_name: true, profile_picture_url: true },
+            select: {
+              id: true,
+              user_id: true,
+              full_name: true,
+              profile_picture_url: true,
+            },
           },
         },
       });
@@ -214,7 +259,9 @@ export class ParticipantsService {
       }
 
       if (participant.activity.host_id !== supabaseUserId) {
-        throw new ForbiddenException('Only the host can approve or reject participants');
+        throw new ForbiddenException(
+          'Only the host can approve or reject participants',
+        );
       }
 
       if (dto.action === 'approve') {
@@ -282,7 +329,10 @@ export class ParticipantsService {
     });
   }
 
-  async listParticipants(activityId: string, supabaseUserId: string): Promise<ParticipantSummaryDto[]> {
+  async listParticipants(
+    activityId: string,
+    supabaseUserId: string,
+  ): Promise<ParticipantSummaryDto[]> {
     const activity = await this.prisma.activity.findUnique({
       where: { id: activityId },
       select: { host_id: true },
@@ -293,21 +343,30 @@ export class ParticipantsService {
     }
 
     if (activity.host_id !== supabaseUserId) {
-      throw new ForbiddenException('Only the host can view the participant roster');
+      throw new ForbiddenException(
+        'Only the host can view the participant roster',
+      );
     }
 
     const participants = await this.prisma.activityParticipant.findMany({
       where: { activity_id: activityId },
       include: {
         profile: {
-          select: { id: true, user_id: true, full_name: true, profile_picture_url: true },
+          select: {
+            id: true,
+            user_id: true,
+            full_name: true,
+            profile_picture_url: true,
+          },
         },
       },
     });
 
     return participants
       .sort((a, b) => {
-        const statusDelta = PARTICIPANT_STATUS_ORDER[a.status] - PARTICIPANT_STATUS_ORDER[b.status];
+        const statusDelta =
+          PARTICIPANT_STATUS_ORDER[a.status] -
+          PARTICIPANT_STATUS_ORDER[b.status];
         if (statusDelta !== 0) {
           return statusDelta;
         }
@@ -326,7 +385,9 @@ export class ParticipantsService {
     });
 
     if (!profile) {
-      throw new BadRequestException('Complete your profile before joining activities');
+      throw new BadRequestException(
+        'Complete your profile before joining activities',
+      );
     }
 
     return profile;
@@ -334,7 +395,16 @@ export class ParticipantsService {
 
   private mapParticipantSummary(
     participant: Prisma.ActivityParticipantGetPayload<{
-      include: { profile: { select: { id: true; user_id: true; full_name: true; profile_picture_url: true } } };
+      include: {
+        profile: {
+          select: {
+            id: true;
+            user_id: true;
+            full_name: true;
+            profile_picture_url: true;
+          };
+        };
+      };
     }>,
   ): ParticipantSummaryDto {
     return {
@@ -352,7 +422,10 @@ export class ParticipantsService {
     };
   }
 
-  private async resequenceWaitlist(tx: Prisma.TransactionClient, activityId: string) {
+  private async resequenceWaitlist(
+    tx: Prisma.TransactionClient,
+    activityId: string,
+  ) {
     const waitlisted = await tx.activityParticipant.findMany({
       where: { activity_id: activityId, status: 'waitlisted' },
       orderBy: [{ waitlist_position: 'asc' }, { joined_at: 'asc' }],
@@ -368,7 +441,10 @@ export class ParticipantsService {
     );
   }
 
-  private async promoteNextWaitlisted(tx: Prisma.TransactionClient, activity: { id: string; max_participants: number }) {
+  private async promoteNextWaitlisted(
+    tx: Prisma.TransactionClient,
+    activity: { id: string; max_participants: number },
+  ) {
     const confirmedCount = await tx.activityParticipant.count({
       where: { activity_id: activity.id, status: 'confirmed' },
     });
@@ -486,4 +562,3 @@ export class ParticipantsService {
     return date;
   }
 }
-

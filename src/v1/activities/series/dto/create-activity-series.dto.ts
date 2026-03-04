@@ -17,4 +17,3 @@ export class CreateActivitySeriesDto {
   @Min(1)
   occurrences?: number;
 }
-

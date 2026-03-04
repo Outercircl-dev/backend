@@ -5,7 +5,9 @@ import { ActivityMessagesService } from './activity-messages.service';
 
 @Injectable()
 export class ActivityMessageAutomationService {
-  private readonly logger = new Logger(ActivityMessageAutomationService.name, { timestamp: true });
+  private readonly logger = new Logger(ActivityMessageAutomationService.name, {
+    timestamp: true,
+  });
 
   constructor(
     private readonly prisma: PrismaService,
@@ -35,7 +37,10 @@ export class ActivityMessageAutomationService {
     });
 
     for (const activity of activities) {
-      const startDateTime = this.buildActivityDateTime(activity.activity_date, activity.start_time);
+      const startDateTime = this.buildActivityDateTime(
+        activity.activity_date,
+        activity.start_time,
+      );
       const endDateTime = this.buildActivityDateTime(
         activity.activity_date,
         activity.end_time ?? activity.start_time,
@@ -69,9 +74,13 @@ export class ActivityMessageAutomationService {
       return;
     }
 
-    await this.messagesService.createSystemMessage(activityId, 'Reminder: your activity starts within 24 hours.', {
-      auto: 'pre',
-    });
+    await this.messagesService.createSystemMessage(
+      activityId,
+      'Reminder: your activity starts within 24 hours.',
+      {
+        auto: 'pre',
+      },
+    );
   }
 
   private async ensurePostMessage(activityId: string, now: Date, end: Date) {
@@ -95,9 +104,13 @@ export class ActivityMessageAutomationService {
       return;
     }
 
-    await this.messagesService.createSystemMessage(activityId, 'Thanks for joining the activity! We hope you had a great time.', {
-      auto: 'post',
-    });
+    await this.messagesService.createSystemMessage(
+      activityId,
+      'Thanks for joining the activity! We hope you had a great time.',
+      {
+        auto: 'post',
+      },
+    );
   }
 
   private async ensureSurveyMessage(activityId: string, now: Date, end: Date) {
@@ -129,11 +142,15 @@ export class ActivityMessageAutomationService {
     const date = new Date(activityDate);
     if (typeof time === 'string') {
       const [hours, minutes, seconds = '0'] = time.split(':');
-      date.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
+      date.setHours(
+        parseInt(hours, 10),
+        parseInt(minutes, 10),
+        parseInt(seconds, 10),
+        0,
+      );
       return date;
     }
     date.setHours(time.getHours(), time.getMinutes(), time.getSeconds(), 0);
     return date;
   }
 }
-

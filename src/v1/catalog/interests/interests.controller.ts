@@ -5,7 +5,7 @@ import { InterestsService } from './interests.service';
 
 @Controller('interests')
 export class InterestsController {
-  constructor(private readonly interests: InterestsService) { }
+  constructor(private readonly interests: InterestsService) {}
 
   @UseGuards(SupabaseAuthGuard)
   @Get()

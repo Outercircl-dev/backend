@@ -10,7 +10,9 @@ export class UsersService {
   // In-memory store just for example; replace with DB.
   private users: User[] = [];
 
-  constructor(private readonly membershipTiersService: MembershipTiersService) {}
+  constructor(
+    private readonly membershipTiersService: MembershipTiersService,
+  ) {}
 
   async findBySupabaseId(supabaseId: string): Promise<User | undefined> {
     return this.users.find((u) => u.supabaseId === supabaseId);

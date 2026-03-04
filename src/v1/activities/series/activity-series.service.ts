@@ -11,7 +11,9 @@ export class ActivitySeriesService {
   async createSeries(user: AuthenticatedUser, dto: CreateActivitySeriesDto) {
     assertVerifiedHost(user);
     if (!user?.supabaseUserId) {
-      throw new BadRequestException('supabaseUserId missing from authenticated request');
+      throw new BadRequestException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
 
     const profile = await this.prisma.user_profiles.findUnique({
@@ -20,7 +22,9 @@ export class ActivitySeriesService {
     });
 
     if (!profile) {
-      throw new BadRequestException('Complete your profile before creating a series');
+      throw new BadRequestException(
+        'Complete your profile before creating a series',
+      );
     }
 
     return this.prisma.activitySeries.create({
@@ -34,4 +38,3 @@ export class ActivitySeriesService {
     });
   }
 }
-
