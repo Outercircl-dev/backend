@@ -1,4 +1,11 @@
-import { Controller, Post, UseGuards, UnauthorizedException, Get, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  UseGuards,
+  UnauthorizedException,
+  Get,
+  Req,
+} from '@nestjs/common';
 import { LocalAuthGuard } from './auth/local-auth.guard';
 import { AuthService } from './auth/auth.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -6,7 +13,7 @@ import type { Request } from 'express';
 
 @Controller()
 export class AppController {
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService) {}
 
   @UseGuards(LocalAuthGuard)
   @Post('auth/login')
@@ -18,13 +25,12 @@ export class AppController {
   @Post('auth/logout')
   async logout(@Req() req: Request) {
     return req.logout((err: any) => {
-      throw new UnauthorizedException(err)
+      throw new UnauthorizedException(err);
     });
   }
 
   @Get('health')
   health(@Req() req: Request) {
-    return true
+    return true;
   }
-
 }

@@ -9,8 +9,11 @@ import { NotificationEmailService } from './providers/email.service';
 @Module({
   imports: [PrismaModule, MembershipModule],
   controllers: [NotificationsController],
-  providers: [NotificationsService, NotificationsSchedulerService, NotificationEmailService],
+  providers: [
+    NotificationsService,
+    NotificationsSchedulerService,
+    NotificationEmailService,
+  ],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}
-

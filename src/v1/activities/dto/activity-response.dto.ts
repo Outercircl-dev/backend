@@ -1,4 +1,8 @@
-export type ParticipationState = 'not_joined' | 'pending' | 'confirmed' | 'waitlisted';
+export type ParticipationState =
+  | 'not_joined'
+  | 'pending'
+  | 'confirmed'
+  | 'waitlisted';
 
 export interface ViewerParticipationMeta {
   participantId: string;
@@ -11,8 +15,11 @@ export interface ViewerParticipationMeta {
 export interface ActivityResponseDto {
   id: string;
   hostId: string;
+  hostUsername: string | null;
+  hostName: string | null;
   title: string;
   description: string | null;
+  imageUrl: string | null;
   category: string | null;
   interests: string[];
   location: {
@@ -45,4 +52,3 @@ export interface ActivityResponseDto {
   meetingPointHidden: boolean;
   viewerParticipation?: ViewerParticipationMeta;
 }
-

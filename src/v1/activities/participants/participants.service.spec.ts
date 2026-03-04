@@ -67,7 +67,10 @@ describe('ParticipantsService', () => {
 
   describe('join', () => {
     it('creates a confirmed participant when slots are available', async () => {
-      prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1', user_id: 'user-1' });
+      prisma.user_profiles.findUnique.mockResolvedValue({
+        id: 'profile-1',
+        user_id: 'user-1',
+      });
       prisma.activity.findUnique.mockResolvedValue({
         id: 'activity-1',
         host_id: 'host-1',
@@ -99,7 +102,9 @@ describe('ParticipantsService', () => {
         status: 'confirmed' as participation_status,
       });
 
-      const result = await service.join('activity-1', 'user-1', { message: 'Hi' });
+      const result = await service.join('activity-1', 'user-1', {
+        message: 'Hi',
+      });
 
       expect(result.status).toBe('confirmed');
       expect(prisma.activityParticipant.create).toHaveBeenCalled();
@@ -111,7 +116,10 @@ describe('ParticipantsService', () => {
     });
 
     it('places user on waitlist when activity is full', async () => {
-      prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1', user_id: 'user-1' });
+      prisma.user_profiles.findUnique.mockResolvedValue({
+        id: 'profile-1',
+        user_id: 'user-1',
+      });
       prisma.activity.findUnique.mockResolvedValue({
         id: 'activity-1',
         host_id: 'host-1',
@@ -200,7 +208,9 @@ describe('ParticipantsService', () => {
         cancelled_at: null,
       };
 
-      prisma.activityParticipant.findUnique.mockResolvedValueOnce(participationRecord);
+      prisma.activityParticipant.findUnique.mockResolvedValueOnce(
+        participationRecord,
+      );
       prisma.activityParticipant.update.mockResolvedValue({
         ...participationRecord,
         status: 'cancelled',
@@ -208,7 +218,11 @@ describe('ParticipantsService', () => {
       });
       prisma.activityParticipant.count.mockResolvedValue(0);
 
-      const result = await service.cancelParticipation('activity-1', 'participant-1', 'user-1');
+      const result = await service.cancelParticipation(
+        'activity-1',
+        'participant-1',
+        'user-1',
+      );
 
       expect(result.status).toBe('cancelled');
       expect(prisma.activityParticipant.update).toHaveBeenCalled();
@@ -220,4 +234,3 @@ describe('ParticipantsService', () => {
     });
   });
 });
-

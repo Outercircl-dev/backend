@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { SupabaseAuthGuard } from 'src/auth/supabase-auth.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request.interface';
 import { ActivityFeedbackService } from './activity-feedback.service';
@@ -15,7 +24,9 @@ export class ActivityFeedbackController {
     @Param('activityId') activityId: string,
   ) {
     if (!req.user?.supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
     return this.feedbackService.getFeedbackForm(activityId, req.user);
   }
@@ -27,7 +38,9 @@ export class ActivityFeedbackController {
     @Body() body: CreateActivityFeedbackDto,
   ) {
     if (!req.user?.supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
     return this.feedbackService.submitFeedback(activityId, req.user, body);
   }
@@ -39,9 +52,14 @@ export class ActivityFeedbackController {
     @Param('profileId') profileId: string,
   ) {
     if (!req.user?.supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
-    return this.feedbackService.getUserRatingSummary(activityId, profileId, req.user);
+    return this.feedbackService.getUserRatingSummary(
+      activityId,
+      profileId,
+      req.user,
+    );
   }
 }
-

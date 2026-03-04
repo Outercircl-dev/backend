@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { SupabaseAuthGuard } from 'src/auth/supabase-auth.guard';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request.interface';
 import { ActivityMessagesService } from './activity-messages.service';
@@ -19,12 +30,19 @@ export class ActivityMessagesController {
     @Query('limit') limit?: string,
   ) {
     if (!req.user?.supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 50;
 
-    return this.messagesService.listMessages(activityId, req.user, pageNum, limitNum);
+    return this.messagesService.listMessages(
+      activityId,
+      req.user,
+      pageNum,
+      limitNum,
+    );
   }
 
   @Post()
@@ -34,7 +52,9 @@ export class ActivityMessagesController {
     @Body() body: CreateActivityMessageDto,
   ) {
     if (!req.user?.supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
     return this.messagesService.createMessage(activityId, req.user, body);
   }
@@ -47,9 +67,16 @@ export class ActivityMessagesController {
     @Body() body: PinActivityMessageDto,
   ) {
     if (!req.user?.supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
-    return this.messagesService.pinMessage(activityId, messageId, req.user, body);
+    return this.messagesService.pinMessage(
+      activityId,
+      messageId,
+      req.user,
+      body,
+    );
   }
 
   @Post(':messageId/report')
@@ -60,9 +87,15 @@ export class ActivityMessagesController {
     @Body() body: ReportActivityMessageDto,
   ) {
     if (!req.user?.supabaseUserId) {
-      throw new UnauthorizedException('supabaseUserId missing from authenticated request');
+      throw new UnauthorizedException(
+        'supabaseUserId missing from authenticated request',
+      );
     }
-    return this.messagesService.reportMessage(activityId, messageId, req.user, body);
+    return this.messagesService.reportMessage(
+      activityId,
+      messageId,
+      req.user,
+      body,
+    );
   }
 }
-

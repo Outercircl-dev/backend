@@ -64,7 +64,10 @@ describe('ActivityMessagesService', () => {
 
   it('allows host to create a pinned announcement', async () => {
     prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1' });
-    prisma.activity.findUnique.mockResolvedValue({ id: 'activity-1', host_id: 'user-1' });
+    prisma.activity.findUnique.mockResolvedValue({
+      id: 'activity-1',
+      host_id: 'user-1',
+    });
     prisma.activityMessage.create.mockResolvedValue({
       id: 'message-1',
       activity_id: 'activity-1',
@@ -80,7 +83,12 @@ describe('ActivityMessagesService', () => {
 
     const result = await service.createMessage(
       'activity-1',
-      { supabaseUserId: 'user-1', type: 'PREMIUM', tierClass: 'premium', isVerified: true } as any,
+      {
+        supabaseUserId: 'user-1',
+        type: 'PREMIUM',
+        tierClass: 'premium',
+        isVerified: true,
+      } as any,
       { content: 'Hello', messageType: 'announcement', isPinned: true },
     );
 
@@ -90,8 +98,13 @@ describe('ActivityMessagesService', () => {
 
   it('rejects non-host announcement', async () => {
     prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1' });
-    prisma.activity.findUnique.mockResolvedValue({ id: 'activity-1', host_id: 'host-1' });
-    prisma.activityParticipant.findUnique.mockResolvedValue({ status: 'confirmed' });
+    prisma.activity.findUnique.mockResolvedValue({
+      id: 'activity-1',
+      host_id: 'host-1',
+    });
+    prisma.activityParticipant.findUnique.mockResolvedValue({
+      status: 'confirmed',
+    });
 
     await expect(
       service.createMessage(
@@ -104,9 +117,17 @@ describe('ActivityMessagesService', () => {
 
   it('blocks duplicate reports', async () => {
     prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1' });
-    prisma.activity.findUnique.mockResolvedValue({ id: 'activity-1', host_id: 'host-1' });
-    prisma.activityParticipant.findUnique.mockResolvedValue({ status: 'confirmed' });
-    prisma.activityMessage.findUnique.mockResolvedValue({ id: 'message-1', activity_id: 'activity-1' });
+    prisma.activity.findUnique.mockResolvedValue({
+      id: 'activity-1',
+      host_id: 'host-1',
+    });
+    prisma.activityParticipant.findUnique.mockResolvedValue({
+      status: 'confirmed',
+    });
+    prisma.activityMessage.findUnique.mockResolvedValue({
+      id: 'message-1',
+      activity_id: 'activity-1',
+    });
     prisma.activityMessageReport.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('duplicate', {
         code: 'P2002',
@@ -124,4 +145,3 @@ describe('ActivityMessagesService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
-

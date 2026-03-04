@@ -36,7 +36,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ActivityMessageAutomationService,
     ActivityFeedbackService,
   ],
-  exports: [ActivitiesService, ParticipantsService, ActivityGroupsService, ActivitySeriesService, ActivityMessagesService],
+  exports: [
+    ActivitiesService,
+    ParticipantsService,
+    ActivityGroupsService,
+    ActivitySeriesService,
+    ActivityMessagesService,
+  ],
 })
-export class ActivitiesModule { }
-
+export class ActivitiesModule {}

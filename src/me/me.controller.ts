@@ -9,7 +9,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SupabaseAuthGuard } from 'src/auth/supabase-auth.guard';
-import type { MembershipTierKey, MembershipTierRules } from 'src/config/membership-tiers.model';
+import type {
+  MembershipTierKey,
+  MembershipTierRules,
+} from 'src/config/membership-tiers.model';
 import { MembershipTiersService } from 'src/config/membership-tiers.service';
 import { UsersService } from 'src/users/users.service';
 import type { AuthenticatedRequest } from 'src/common/interfaces/authenticated-request.interface';
@@ -39,7 +42,7 @@ export class MeController {
     private readonly profileService: ProfileService,
     private readonly membershipTiersService: MembershipTiersService,
     private readonly membershipSubscriptionsService: MembershipSubscriptionsService,
-  ) { }
+  ) {}
 
   @UseGuards(SupabaseAuthGuard)
   @Get()
@@ -52,11 +55,14 @@ export class MeController {
       );
     }
 
-    this.logger.log('User', user)
+    this.logger.log('User', user);
 
     const profile = await this.profileService.getProfile(user.supabaseUserId);
 
-    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId);
+    const tierKey =
+      await this.membershipSubscriptionsService.resolveTierForUserId(
+        user.supabaseUserId,
+      );
     const tierRules = this.membershipTiersService.getTierRules(tierKey);
 
     return {
@@ -98,7 +104,10 @@ export class MeController {
       user.type ?? this.membershipTiersService.getDefaultTier(),
     );
 
-    const tierKey = await this.membershipSubscriptionsService.resolveTierForUserId(updatedUser.supabaseId);
+    const tierKey =
+      await this.membershipSubscriptionsService.resolveTierForUserId(
+        updatedUser.supabaseId,
+      );
     const tierRules = this.membershipTiersService.getTierRules(tierKey);
 
     return {

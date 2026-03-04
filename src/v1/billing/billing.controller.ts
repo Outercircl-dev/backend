@@ -21,7 +21,9 @@ interface CheckoutRequest {
 
 @Controller('billing')
 export class BillingController {
-  private readonly logger = new Logger(BillingController.name, { timestamp: true });
+  private readonly logger = new Logger(BillingController.name, {
+    timestamp: true,
+  });
 
   constructor(
     private readonly billingService: BillingService,
@@ -30,10 +32,15 @@ export class BillingController {
 
   @UseGuards(SupabaseAuthGuard)
   @Post('checkout')
-  async checkout(@Req() req: AuthenticatedRequest, @Body() body: CheckoutRequest) {
+  async checkout(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: CheckoutRequest,
+  ) {
     const user = req.user ?? {};
     if (!user.supabaseUserId || !user.email) {
-      throw new BadRequestException('Authenticated user missing required identifiers');
+      throw new BadRequestException(
+        'Authenticated user missing required identifiers',
+      );
     }
 
     return this.billingService.createCheckoutSession(
@@ -48,11 +55,15 @@ export class BillingController {
     try {
       const signature = req.headers['stripe-signature'];
       const payload = req.body as Buffer;
-      const event = this.billingService.verifyWebhookSignature(payload, signature);
+      const event = this.billingService.verifyWebhookSignature(
+        payload,
+        signature,
+      );
       await this.billingService.handleWebhook(event);
       res.status(200).json({ received: true });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Webhook handling failed';
+      const message =
+        error instanceof Error ? error.message : 'Webhook handling failed';
       this.logger.error(`Stripe webhook error: ${message}`);
       res.status(400).json({ error: message });
     }
@@ -63,12 +74,18 @@ export class BillingController {
   async status(@Req() req: AuthenticatedRequest) {
     const user = req.user ?? {};
     if (!user.supabaseUserId) {
-      throw new BadRequestException('Authenticated user missing required identifiers');
+      throw new BadRequestException(
+        'Authenticated user missing required identifiers',
+      );
     }
 
     const [subscription, tier] = await Promise.all([
-      this.membershipSubscriptionsService.getSubscriptionByUserId(user.supabaseUserId),
-      this.membershipSubscriptionsService.resolveTierForUserId(user.supabaseUserId),
+      this.membershipSubscriptionsService.getSubscriptionByUserId(
+        user.supabaseUserId,
+      ),
+      this.membershipSubscriptionsService.resolveTierForUserId(
+        user.supabaseUserId,
+      ),
     ]);
 
     return { tier, subscription };

@@ -1,20 +1,27 @@
 export default () => ({
-    nodeEnv: process.env.NODE_ENV,
-    port: Number(process.env.PORT || 3000),
+  nodeEnv: process.env.NODE_ENV,
+  port: Number(process.env.PORT || 3000),
 
-    database: {
-        url: process.env.DATABASE_URL,
-        directUrl: process.env.DIRECT_URL,
-    },
+  database: {
+    url: process.env.DATABASE_URL,
+    directUrl: process.env.DIRECT_URL,
+  },
 
-    jwt: {
-        secret: process.env.JWT_SECRET,
-        expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
-    },
+  jwt: {
+    secret: process.env.JWT_SECRET,
+    expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
+  },
 
-    notifications: {
-        emailProviderMode: process.env.EMAIL_PROVIDER_MODE ?? 'log',
-        emailFrom: process.env.EMAIL_FROM ?? 'no-reply@outercircl.local',
-        emailWebhookUrl: process.env.EMAIL_WEBHOOK_URL,
-    },
+  notifications: {
+    emailProviderMode: process.env.EMAIL_PROVIDER_MODE ?? 'log',
+    emailFrom: process.env.EMAIL_FROM ?? 'no-reply@outercircl.local',
+    emailWebhookUrl: process.env.EMAIL_WEBHOOK_URL,
+  },
+  aws: {
+    region: process.env.AWS_REGION,
+    activityImagesBucket: process.env.AWS_S3_ACTIVITY_IMAGES_BUCKET,
+    activityImagesPublicBaseUrl:
+      process.env.AWS_S3_ACTIVITY_IMAGES_PUBLIC_BASE_URL,
+    activityImagesKeyPrefix: process.env.AWS_S3_ACTIVITY_IMAGES_KEY_PREFIX,
+  },
 });

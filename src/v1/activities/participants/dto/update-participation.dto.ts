@@ -10,4 +10,3 @@ export class UpdateParticipationDto {
   @MaxLength(500)
   message?: string;
 }
-

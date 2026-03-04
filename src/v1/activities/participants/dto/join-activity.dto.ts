@@ -11,4 +11,3 @@ export class JoinActivityDto {
   @MaxLength(64)
   inviteCode?: string;
 }
-

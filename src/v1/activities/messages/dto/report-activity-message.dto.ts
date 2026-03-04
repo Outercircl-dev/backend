@@ -11,4 +11,3 @@ export class ReportActivityMessageDto {
   @MaxLength(2000)
   details?: string;
 }
-

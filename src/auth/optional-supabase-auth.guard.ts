@@ -8,11 +8,15 @@ import { AuthGuard } from '@nestjs/passport';
  */
 @Injectable()
 export class OptionalSupabaseAuthGuard extends AuthGuard('supabase-jwt') {
-  handleRequest(err: unknown, user: any, info: unknown, context: ExecutionContext) {
+  handleRequest(
+    err: unknown,
+    user: any,
+    info: unknown,
+    context: ExecutionContext,
+  ) {
     if (err || !user) {
       return undefined;
     }
     return user;
   }
 }
-

@@ -166,6 +166,7 @@ export class ActivitiesService {
         host_id: user.supabaseUserId,
         title: dto.title,
         description: dto.description || null,
+        image_url: dto.imageUrl || null,
         category: dto.category,
         interests: dto.interests,
         location: dto.location as any, // Cast to any for Prisma JSON type
@@ -257,6 +258,60 @@ export class ActivitiesService {
     }
 
     return this.mapToResponseDto(activity, viewerId);
+  }
+
+  async findJoinedPast(
+    user: AuthenticatedUser,
+    page = 1,
+    limit = 20,
+  ): Promise<{
+    items: ActivityResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    if (!user?.supabaseUserId) {
+      throw new BadRequestException(
+        'supabaseUserId missing from authenticated request',
+      );
+    }
+    const profile = await this.getProfileForUser(user.supabaseUserId);
+    const where: Prisma.ActivityParticipantWhereInput = {
+      profile_id: profile.id,
+      status: {
+        in: ['pending', 'confirmed', 'waitlisted'],
+      },
+    };
+
+    const participations = await this.prisma.activityParticipant.findMany({
+      where,
+      orderBy: [{ activity: { activity_date: 'desc' } }, { joined_at: 'desc' }],
+      include: {
+        activity: true,
+      },
+    });
+
+    const pastParticipations = participations.filter((item) =>
+      this.isActivityPast(item.activity),
+    );
+    const total = pastParticipations.length;
+    const skip = (page - 1) * limit;
+    const pagedParticipations = pastParticipations.slice(skip, skip + limit);
+
+    const items = await Promise.all(
+      pagedParticipations.map((item) =>
+        this.mapToResponseDto(item.activity, user.supabaseUserId),
+      ),
+    );
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async update(
@@ -379,6 +434,7 @@ export class ActivitiesService {
     const updateData: Prisma.ActivityUpdateInput = {
       title: dto.title,
       description: dto.description || null,
+      image_url: dto.imageUrl || null,
       category: dto.category,
       interests: dto.interests,
       location: dto.location as any, // Cast to any for Prisma JSON type
@@ -504,6 +560,22 @@ export class ActivitiesService {
     return start.getTime() <= Date.now();
   }
 
+  private isActivityPast(activity: {
+    status: 'draft' | 'published' | 'completed' | 'cancelled';
+    activity_date: Date;
+    start_time: Date | string;
+    end_time?: Date | string | null;
+  }): boolean {
+    if (activity.status === 'completed' || activity.status === 'cancelled') {
+      return true;
+    }
+    const reference = this.buildActivityStart(
+      activity.activity_date,
+      activity.end_time ?? activity.start_time,
+    );
+    return reference.getTime() <= Date.now();
+  }
+
   private buildActivityStart(
     activityDate: Date,
     startTime: Date | string,
@@ -551,39 +623,49 @@ export class ActivitiesService {
     activity: any,
     viewerId?: string,
   ): Promise<ActivityResponseDto> {
-    const [confirmedCount, waitlistCount, viewerProfile, group, series] =
-      await Promise.all([
-        this.prisma.activityParticipant.count({
-          where: { activity_id: activity.id, status: 'confirmed' },
-        }),
-        this.prisma.activityParticipant.count({
-          where: { activity_id: activity.id, status: 'waitlisted' },
-        }),
-        viewerId
-          ? this.prisma.user_profiles.findUnique({
-              where: { user_id: viewerId },
-              select: { id: true },
-            })
-          : Promise.resolve(null),
-        activity.group_id
-          ? this.prisma.activityGroup.findUnique({
-              where: { id: activity.group_id },
-              select: { id: true, name: true, is_public: true },
-            })
-          : Promise.resolve(null),
-        activity.series_id
-          ? this.prisma.activitySeries.findUnique({
-              where: { id: activity.series_id },
-              select: {
-                id: true,
-                frequency: true,
-                interval: true,
-                ends_on: true,
-                occurrences: true,
-              },
-            })
-          : Promise.resolve(null),
-      ]);
+    const [
+      confirmedCount,
+      waitlistCount,
+      viewerProfile,
+      group,
+      series,
+      hostProfile,
+    ] = await Promise.all([
+      this.prisma.activityParticipant.count({
+        where: { activity_id: activity.id, status: 'confirmed' },
+      }),
+      this.prisma.activityParticipant.count({
+        where: { activity_id: activity.id, status: 'waitlisted' },
+      }),
+      viewerId
+        ? this.prisma.user_profiles.findUnique({
+            where: { user_id: viewerId },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      activity.group_id
+        ? this.prisma.activityGroup.findUnique({
+            where: { id: activity.group_id },
+            select: { id: true, name: true, is_public: true },
+          })
+        : Promise.resolve(null),
+      activity.series_id
+        ? this.prisma.activitySeries.findUnique({
+            where: { id: activity.series_id },
+            select: {
+              id: true,
+              frequency: true,
+              interval: true,
+              ends_on: true,
+              occurrences: true,
+            },
+          })
+        : Promise.resolve(null),
+      this.prisma.user_profiles.findUnique({
+        where: { user_id: activity.host_id },
+        select: { username: true, full_name: true },
+      }),
+    ]);
 
     let viewerParticipation: any | null = null;
     if (viewerProfile) {
@@ -605,8 +687,11 @@ export class ActivitiesService {
     const response: ActivityResponseDto = {
       id: activity.id,
       hostId: activity.host_id,
+      hostUsername: hostProfile?.username ?? null,
+      hostName: hostProfile?.full_name ?? null,
       title: activity.title,
       description: activity.description,
+      imageUrl: activity.image_url ?? null,
       category: activity.category,
       interests: activity.interests as string[],
       location: this.prepareLocationForViewer(

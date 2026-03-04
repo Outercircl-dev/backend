@@ -4,4 +4,3 @@ export class PinActivityMessageDto {
   @IsBoolean()
   isPinned: boolean;
 }
-

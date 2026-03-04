@@ -102,9 +102,14 @@ describe('ProfileService usernames', () => {
   });
 
   it('reports username availability as false when claimed by another user', async () => {
-    prisma.user_profiles.findUnique.mockResolvedValue({ user_id: 'someone-else' });
+    prisma.user_profiles.findUnique.mockResolvedValue({
+      user_id: 'someone-else',
+    });
 
-    const result = await service.checkUsernameAvailability('taken_name', 'user-1');
+    const result = await service.checkUsernameAvailability(
+      'taken_name',
+      'user-1',
+    );
 
     expect(result.available).toBe(false);
   });

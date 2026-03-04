@@ -113,4 +113,3 @@ describe('NotificationsService', () => {
     expect(result.updatedCount).toBe(4);
   });
 });
-
