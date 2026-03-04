@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { ParticipantsService } from './participants.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityNotificationsService } from '../activity-notifications.service';
@@ -155,6 +156,27 @@ describe('ParticipantsService', () => {
           type: 'activity.waitlisted',
         }),
       );
+    });
+
+    it('rejects joining an activity that already started', async () => {
+      prisma.user_profiles.findUnique.mockResolvedValue({
+        id: 'profile-1',
+        user_id: 'user-1',
+      });
+      prisma.activity.findUnique.mockResolvedValue({
+        id: 'activity-1',
+        host_id: 'host-1',
+        status: 'published',
+        is_public: true,
+        max_participants: 10,
+        activity_date: new Date('2000-01-01'),
+        start_time: '00:00:00',
+      });
+
+      await expect(service.join('activity-1', 'user-1', {})).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.activityParticipant.create).not.toHaveBeenCalled();
     });
   });
 

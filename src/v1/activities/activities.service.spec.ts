@@ -487,6 +487,36 @@ describe('ActivitiesService', () => {
         service.update(activityId, hostUser, updateDto),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should reject edits when activity has already started', async () => {
+      const startedActivity = {
+        id: activityId,
+        host_id: hostId,
+        title: 'Started Activity',
+        description: 'Original',
+        category: 'Sports',
+        interests: ['basketball'],
+        location: { latitude: 37.7749, longitude: -122.4194 },
+        activity_date: new Date('2000-01-01'),
+        start_time: '00:00:00',
+        end_time: '01:00:00',
+        max_participants: 4,
+        current_participants: 2,
+        status: 'published',
+        is_public: true,
+        group_id: null,
+        series_id: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      mockPrismaService.activity.findUnique.mockResolvedValue(startedActivity);
+
+      await expect(
+        service.update(activityId, hostUser, updateDto),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrismaService.activity.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('remove', () => {

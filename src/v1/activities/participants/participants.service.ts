@@ -54,6 +54,11 @@ export class ParticipantsService {
       if (activity.status !== 'published') {
         throw new BadRequestException('Activity is not accepting new participants');
       }
+      if (this.hasActivityStarted(activity)) {
+        throw new BadRequestException(
+          'Cannot join an activity that has already started',
+        );
+      }
 
       const existing = await tx.activityParticipant.findUnique({
         where: {
@@ -441,6 +446,44 @@ export class ParticipantsService {
         });
         break;
     }
+  }
+
+  private hasActivityStarted(activity: {
+    activity_date?: Date;
+    start_time?: Date | string;
+  }): boolean {
+    if (!activity.activity_date || !activity.start_time) {
+      return false;
+    }
+    const start = this.buildActivityStart(
+      activity.activity_date,
+      activity.start_time,
+    );
+    return start.getTime() <= Date.now();
+  }
+
+  private buildActivityStart(
+    activityDate: Date,
+    startTime: Date | string,
+  ): Date {
+    const date = new Date(activityDate);
+    if (typeof startTime === 'string') {
+      const [hours, minutes, seconds = '0'] = startTime.split(':');
+      date.setHours(
+        parseInt(hours, 10),
+        parseInt(minutes, 10),
+        parseInt(seconds, 10),
+        0,
+      );
+      return date;
+    }
+    date.setHours(
+      startTime.getHours(),
+      startTime.getMinutes(),
+      startTime.getSeconds(),
+      0,
+    );
+    return date;
   }
 }
 
