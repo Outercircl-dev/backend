@@ -1,4 +1,22 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsObject, IsDateString, IsInt, Min, IsBoolean, ValidateNested, IsNumber, MinLength, Max, ArrayMinSize, Matches, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  IsObject,
+  IsDateString,
+  IsInt,
+  Min,
+  IsBoolean,
+  ValidateNested,
+  IsNumber,
+  MinLength,
+  Max,
+  ArrayMinSize,
+  Matches,
+  IsIn,
+  MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class LocationDto {
@@ -14,6 +32,12 @@ class LocationDto {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(5)
+  @MaxLength(160)
+  @Matches(/^(?=.*[A-Za-z])[A-Za-z0-9\s,.'#/-]+$/, {
+    message:
+      'address must contain letters and only standard address characters',
+  })
   address: string;
 }
 
@@ -64,6 +88,11 @@ export class CreateActivityDto {
   @IsDateString()
   activityDate: string;
 
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  timezone?: string;
+
   @IsString()
   @IsNotEmpty()
   @Matches(/^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/, {
@@ -95,4 +124,3 @@ export class CreateActivityDto {
   @Type(() => RecurrenceDto)
   recurrence?: RecurrenceDto | null;
 }
-
