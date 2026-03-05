@@ -159,6 +159,7 @@ describe('ActivitiesService', () => {
         latitude: 37.7749,
         longitude: -122.4194,
         address: 'San Francisco, CA',
+        placeId: 'mock_place_123',
       },
       activityDate: '2099-12-31',
       startTime: '10:00',
@@ -201,6 +202,15 @@ describe('ActivitiesService', () => {
         select: { slug: true },
       });
       expect(mockPrismaService.activity.create).toHaveBeenCalled();
+      expect(mockPrismaService.activity.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            location: expect.objectContaining({
+              placeId: 'mock_place_123',
+            }),
+          }),
+        }),
+      );
       expect(result.id).toBe('activity-123');
       expect(result.status).toBe('published');
     });
@@ -379,6 +389,85 @@ describe('ActivitiesService', () => {
       });
     });
 
+    it('should hide exact location for non-participants and return rounded coordinates', async () => {
+      const mockActivity = {
+        id: 'activity-123',
+        host_id: 'host-1',
+        title: 'Test Activity',
+        description: 'Test',
+        category: 'Sports',
+        interests: ['basketball'],
+        location: {
+          latitude: 37.7749,
+          longitude: -122.4194,
+          address: '221B Baker Street',
+          placeId: 'mock_place_123',
+        },
+        activity_date: new Date('2099-12-31'),
+        start_time: '10:00',
+        end_time: '12:00',
+        max_participants: 10,
+        current_participants: 5,
+        status: 'published',
+        is_public: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      mockPrismaService.activity.findUnique.mockResolvedValue(mockActivity);
+
+      const result = await service.findOne('activity-123', 'viewer-1');
+
+      expect(result.meetingPointHidden).toBe(true);
+      expect(result.location.address).toBeUndefined();
+      expect(result.location.latitude).toBe(37.77);
+      expect(result.location.longitude).toBe(-122.42);
+      expect(result.location.placeId).toBe('mock_place_123');
+    });
+
+    it('should show exact location for confirmed participants', async () => {
+      const mockActivity = {
+        id: 'activity-123',
+        host_id: 'host-1',
+        title: 'Test Activity',
+        description: 'Test',
+        category: 'Sports',
+        interests: ['basketball'],
+        location: {
+          latitude: 37.7749,
+          longitude: -122.4194,
+          address: '221B Baker Street',
+          placeId: 'mock_place_123',
+        },
+        activity_date: new Date('2099-12-31'),
+        start_time: '10:00',
+        end_time: '12:00',
+        max_participants: 10,
+        current_participants: 5,
+        status: 'published',
+        is_public: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      mockPrismaService.activity.findUnique.mockResolvedValue(mockActivity);
+      mockPrismaService.activityParticipant.findUnique.mockResolvedValue({
+        id: 'participant-1',
+        status: 'confirmed',
+        waitlist_position: null,
+        joined_at: new Date(),
+        approved_at: new Date(),
+      });
+
+      const result = await service.findOne('activity-123', 'viewer-1');
+
+      expect(result.meetingPointHidden).toBe(false);
+      expect(result.location.address).toBe('221B Baker Street');
+      expect(result.location.latitude).toBe(37.7749);
+      expect(result.location.longitude).toBe(-122.4194);
+      expect(result.location.placeId).toBe('mock_place_123');
+    });
+
     it('should throw NotFoundException when activity not found', async () => {
       mockPrismaService.activity.findUnique.mockResolvedValue(null);
 
@@ -406,6 +495,7 @@ describe('ActivitiesService', () => {
         latitude: 37.7749,
         longitude: -122.4194,
         address: 'San Francisco, CA',
+        placeId: 'mock_place_123',
       },
       activityDate: '2099-12-31',
       startTime: '10:00',
