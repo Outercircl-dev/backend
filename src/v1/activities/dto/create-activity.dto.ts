@@ -35,11 +35,20 @@ class LocationDto {
   @IsNotEmpty()
   @MinLength(5)
   @MaxLength(160)
-  @Matches(/^(?=.*[A-Za-z])[A-Za-z0-9\s,.'#/-]+$/, {
+  @Matches(/^(?=.*[\p{L}])[\p{L}\p{M}0-9\s,.'#/()&-]+$/u, {
     message:
       'address must contain letters and only standard address characters',
   })
   address: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  @Matches(/^[-A-Za-z0-9_]+$/, {
+    message: 'placeId must only contain letters, numbers, hyphens, or underscores',
+  })
+  placeId?: string;
 }
 
 class RecurrenceDto {

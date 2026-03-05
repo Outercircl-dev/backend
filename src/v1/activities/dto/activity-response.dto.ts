@@ -26,6 +26,7 @@ export interface ActivityResponseDto {
     latitude: number;
     longitude: number;
     address?: string;
+    placeId?: string;
   };
   activityDate: string;
   startTime: string;

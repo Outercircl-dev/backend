@@ -741,7 +741,7 @@ export class ActivitiesService {
   private prepareLocationForViewer(
     rawLocation: any,
     revealExactLocation: boolean,
-  ): { latitude: number; longitude: number; address?: string } {
+  ): { latitude: number; longitude: number; address?: string; placeId?: string } {
     if (!rawLocation) {
       return { latitude: 0, longitude: 0 };
     }
@@ -750,13 +750,26 @@ export class ActivitiesService {
       latitude: number;
       longitude: number;
       address?: string;
+      placeId?: string;
     };
-    if (revealExactLocation || !location.address) {
+    if (revealExactLocation) {
       return location;
     }
 
-    const { address, ...rest } = location;
-    return rest;
+    const { address: _address, ...rest } = location;
+    return {
+      ...rest,
+      latitude: this.roundCoordinate(location.latitude, 2),
+      longitude: this.roundCoordinate(location.longitude, 2),
+    };
+  }
+
+  private roundCoordinate(value: number, decimals: number): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return 0;
+    }
+    const factor = 10 ** decimals;
+    return Math.round(value * factor) / factor;
   }
 
   private formatViewerParticipation(

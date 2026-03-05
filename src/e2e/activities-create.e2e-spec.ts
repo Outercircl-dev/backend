@@ -172,6 +172,7 @@ describe('Activities create integration', () => {
           address: '123456',
           latitude: 37.7749,
           longitude: -122.4194,
+          placeId: 'mock_place_123',
         },
         activityDate: '2099-12-31',
         startTime: '10:00',
@@ -199,6 +200,7 @@ describe('Activities create integration', () => {
           address: '221B Baker Street',
           latitude: 37.7749,
           longitude: -122.4194,
+          placeId: 'mock_place_123',
         },
         activityDate: '2000-01-01',
         startTime: '00:00',
@@ -229,6 +231,7 @@ describe('Activities create integration', () => {
         address: '221B Baker Street',
         latitude: 37.7749,
         longitude: -122.4194,
+        placeId: 'mock_place_123',
       },
       activity_date: new Date('2099-12-31'),
       start_time: '10:00:00',
@@ -253,6 +256,7 @@ describe('Activities create integration', () => {
           address: '221B Baker Street',
           latitude: 37.7749,
           longitude: -122.4194,
+          placeId: 'mock_place_123',
         },
         activityDate: '2099-12-31',
         startTime: '10:00',
@@ -264,5 +268,38 @@ describe('Activities create integration', () => {
     expect(response.status).toBe(201);
     expect(response.body.id).toBe('activity-123');
     expect(mockPrismaService.activity.create).toHaveBeenCalled();
+    expect(mockPrismaService.activity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          location: expect.objectContaining({
+            placeId: 'mock_place_123',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('rejects invalid placeId format with HTTP 400', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/activities')
+      .send({
+        title: 'Evening Run',
+        category: 'Sports',
+        interests: ['running'],
+        location: {
+          address: '221B Baker Street',
+          latitude: 37.7749,
+          longitude: -122.4194,
+          placeId: 'invalid place id!',
+        },
+        activityDate: '2099-12-31',
+        startTime: '10:00',
+        endTime: '11:00',
+        timezone: 'UTC',
+        maxParticipants: 4,
+      });
+
+    expect(response.status).toBe(400);
+    expect(mockPrismaService.activity.create).not.toHaveBeenCalled();
   });
 });
