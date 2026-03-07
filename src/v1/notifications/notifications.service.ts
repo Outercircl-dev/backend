@@ -581,6 +581,9 @@ export class NotificationsService {
     if (type === 'participant_joined' || type === 'participant_cancelled') {
       return 'host_join_cancel_updates';
     }
+    if (type === 'host_update') {
+      return 'host_join_cancel_updates';
+    }
     if (
       type === 'activity_time_changed' ||
       type === 'activity_location_changed'

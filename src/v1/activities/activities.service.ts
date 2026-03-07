@@ -397,12 +397,42 @@ export class ActivitiesService {
     const changeNotes: string[] = [];
     let hasTimeChange = false;
     let hasLocationChange = false;
+    let hasNonScheduleDetailChange = false;
+    if (dto.title.trim() !== existing.title.trim()) {
+      changeNotes.push('title updated');
+      hasNonScheduleDetailChange = true;
+    }
+    if ((dto.description ?? null) !== (existing.description ?? null)) {
+      changeNotes.push('description updated');
+      hasNonScheduleDetailChange = true;
+    }
+    if ((dto.imageUrl ?? null) !== (existing.image_url ?? null)) {
+      changeNotes.push('image updated');
+      hasNonScheduleDetailChange = true;
+    }
+    if ((dto.category ?? null) !== (existing.category ?? null)) {
+      changeNotes.push('category updated');
+      hasNonScheduleDetailChange = true;
+    }
+    if (JSON.stringify(dto.interests) !== JSON.stringify(existing.interests)) {
+      changeNotes.push('interests updated');
+      hasNonScheduleDetailChange = true;
+    }
+    if (dto.maxParticipants !== existing.max_participants) {
+      changeNotes.push('participant limit updated');
+      hasNonScheduleDetailChange = true;
+    }
+    if (dto.isPublic !== undefined && dto.isPublic !== existing.is_public) {
+      changeNotes.push('visibility updated');
+      hasNonScheduleDetailChange = true;
+    }
     if (
       dto.activityDate &&
       activityDate.toISOString().split('T')[0] !==
         existing.activity_date.toISOString().split('T')[0]
     ) {
       changeNotes.push('date updated');
+      hasTimeChange = true;
     }
     if (
       dto.startTime &&
@@ -519,6 +549,13 @@ export class ActivitiesService {
           hasTimeChange,
           hasLocationChange,
         },
+      );
+    }
+    if (hasNonScheduleDetailChange) {
+      await this.notifyParticipantsOfDetailChanges(
+        activity,
+        user.supabaseUserId,
+        changeNotes,
       );
     }
 
@@ -797,23 +834,10 @@ export class ActivitiesService {
     hostUserId: string,
     flags: { hasTimeChange: boolean; hasLocationChange: boolean },
   ) {
-    const participants = await this.prisma.activityParticipant.findMany({
-      where: {
-        activity_id: activity.id,
-        status: {
-          in: ['pending', 'confirmed', 'waitlisted'],
-        },
-      },
-      select: {
-        profile: {
-          select: { user_id: true },
-        },
-      },
-    });
-
-    const recipientUserIds = participants
-      .map((participant) => participant.profile.user_id)
-      .filter((userId) => userId !== hostUserId);
+    const recipientUserIds = await this.getParticipantRecipientUserIds(
+      activity.id,
+      hostUserId,
+    );
 
     if (recipientUserIds.length === 0) {
       return;
@@ -838,6 +862,55 @@ export class ActivitiesService {
         body: `The host updated the location for "${activity.title}".`,
       });
     }
+  }
+
+  private async notifyParticipantsOfDetailChanges(
+    activity: { id: string; title: string },
+    hostUserId: string,
+    changeNotes: string[],
+  ) {
+    const recipientUserIds = await this.getParticipantRecipientUserIds(
+      activity.id,
+      hostUserId,
+    );
+
+    if (recipientUserIds.length === 0) {
+      return;
+    }
+
+    await this.notificationsService.createForRecipients(recipientUserIds, {
+      actorUserId: hostUserId,
+      activityId: activity.id,
+      type: 'host_update',
+      title: 'Activity details updated',
+      body: `The host updated activity details for "${activity.title}".`,
+      payload: {
+        changes: changeNotes,
+      },
+    });
+  }
+
+  private async getParticipantRecipientUserIds(
+    activityId: string,
+    hostUserId: string,
+  ): Promise<string[]> {
+    const participants = await this.prisma.activityParticipant.findMany({
+      where: {
+        activity_id: activityId,
+        status: {
+          in: ['pending', 'confirmed', 'waitlisted'],
+        },
+      },
+      select: {
+        profile: {
+          select: { user_id: true },
+        },
+      },
+    });
+
+    return participants
+      .map((participant) => participant.profile.user_id)
+      .filter((userId) => userId !== hostUserId);
   }
 
   /**
