@@ -84,6 +84,18 @@ export class ActivityNotificationsService {
       payload.type === 'activity.approved' ||
       payload.type === 'activity.rejected'
     ) {
+      if (payload.type === 'activity.approval_pending') {
+        await this.notificationsService.createNotification({
+          recipientUserId: activity.host_id,
+          actorUserId: payload.userId,
+          activityId: activity.id,
+          type: 'participant_joined',
+          title: 'New private join request',
+          body: `A participant requested to join "${activity.title}".`,
+          payload: payload.metadata,
+        });
+      }
+
       await this.notificationsService.createNotification({
         recipientUserId: payload.userId,
         actorUserId: activity.host_id,

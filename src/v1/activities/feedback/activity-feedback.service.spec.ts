@@ -4,12 +4,16 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityFeedbackService } from './activity-feedback.service';
 import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
 import { MembershipTiersService } from 'src/config/membership-tiers.service';
+import { NotificationsService } from 'src/v1/notifications/notifications.service';
 
 describe('ActivityFeedbackService', () => {
   let service: ActivityFeedbackService;
   let prisma: any;
   let membershipSubscriptionsService: { resolveTierForUserId: jest.Mock };
   let membershipTiersService: { getTierClass: jest.Mock };
+  let notificationsService: {
+    createNotification: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -45,6 +49,9 @@ describe('ActivityFeedbackService', () => {
           tier === 'PREMIUM' ? 'premium' : 'freemium',
         ),
     };
+    notificationsService = {
+      createNotification: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -61,10 +68,15 @@ describe('ActivityFeedbackService', () => {
           provide: MembershipTiersService,
           useValue: membershipTiersService,
         },
+        {
+          provide: NotificationsService,
+          useValue: notificationsService,
+        },
       ],
     }).compile();
 
     service = module.get(ActivityFeedbackService);
+    notificationsService.createNotification.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -120,6 +132,7 @@ describe('ActivityFeedbackService', () => {
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
       host_id: 'host-1',
+      title: 'Test activity',
       status: 'completed',
       activity_date: new Date(),
       start_time: new Date(),
@@ -149,6 +162,9 @@ describe('ActivityFeedbackService', () => {
       },
     };
     prisma.$transaction.mockImplementation((cb: any) => cb(tx));
+    prisma.user_profiles.findMany = jest.fn().mockResolvedValue([
+      { id: 'profile-2', user_id: 'user-2' },
+    ]);
 
     await service.submitFeedback(
       'activity-1',
@@ -181,6 +197,18 @@ describe('ActivityFeedbackService', () => {
       },
       data: { flagged_for_review: true },
     });
+    expect(notificationsService.createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: 'host-1',
+        type: 'host_update',
+      }),
+    );
+    expect(notificationsService.createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: 'user-2',
+        title: 'You received a participant rating',
+      }),
+    );
   });
 
   it('blocks non-premium users from viewing rating summaries', async () => {
@@ -208,6 +236,7 @@ describe('ActivityFeedbackService', () => {
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
       host_id: 'host-1',
+      title: 'Test activity',
       status: 'completed',
       activity_date: new Date(),
       start_time: new Date(),

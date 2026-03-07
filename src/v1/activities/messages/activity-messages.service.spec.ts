@@ -3,6 +3,7 @@ import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Prisma } from 'src/generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityMessagesService } from './activity-messages.service';
+import { NotificationsService } from 'src/v1/notifications/notifications.service';
 
 describe('ActivityMessagesService', () => {
   let service: ActivityMessagesService;
@@ -14,6 +15,10 @@ describe('ActivityMessagesService', () => {
     user_profiles: any;
     $transaction: jest.Mock;
   };
+  let notificationsService: {
+    createForRecipients: jest.Mock;
+    createNotification: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -22,6 +27,7 @@ describe('ActivityMessagesService', () => {
       },
       activityParticipant: {
         findUnique: jest.fn(),
+        findMany: jest.fn(),
       },
       activityMessage: {
         create: jest.fn(),
@@ -44,6 +50,10 @@ describe('ActivityMessagesService', () => {
         }),
       ),
     };
+    notificationsService = {
+      createForRecipients: jest.fn(),
+      createNotification: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -52,10 +62,17 @@ describe('ActivityMessagesService', () => {
           provide: PrismaService,
           useValue: prisma,
         },
+        {
+          provide: NotificationsService,
+          useValue: notificationsService,
+        },
       ],
     }).compile();
 
     service = module.get(ActivityMessagesService);
+    prisma.activityParticipant.findMany.mockResolvedValue([]);
+    notificationsService.createForRecipients.mockResolvedValue(0);
+    notificationsService.createNotification.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -67,6 +84,7 @@ describe('ActivityMessagesService', () => {
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
       host_id: 'user-1',
+      title: 'Morning Run',
     });
     prisma.activityMessage.create.mockResolvedValue({
       id: 'message-1',
@@ -80,6 +98,9 @@ describe('ActivityMessagesService', () => {
       updated_at: new Date(),
       author: { id: 'profile-1', full_name: 'Host', profile_picture_url: null },
     });
+    prisma.activityParticipant.findMany.mockResolvedValue([
+      { profile: { user_id: 'user-2' } },
+    ]);
 
     const result = await service.createMessage(
       'activity-1',
@@ -94,6 +115,7 @@ describe('ActivityMessagesService', () => {
 
     expect(result.isPinned).toBe(true);
     expect(prisma.activityMessage.updateMany).toHaveBeenCalled();
+    expect(notificationsService.createForRecipients).toHaveBeenCalled();
   });
 
   it('rejects non-host announcement', async () => {
@@ -101,6 +123,7 @@ describe('ActivityMessagesService', () => {
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
       host_id: 'host-1',
+      title: 'Morning Run',
     });
     prisma.activityParticipant.findUnique.mockResolvedValue({
       status: 'confirmed',
@@ -120,6 +143,7 @@ describe('ActivityMessagesService', () => {
     prisma.activity.findUnique.mockResolvedValue({
       id: 'activity-1',
       host_id: 'host-1',
+      title: 'Morning Run',
     });
     prisma.activityParticipant.findUnique.mockResolvedValue({
       status: 'confirmed',
@@ -143,5 +167,39 @@ describe('ActivityMessagesService', () => {
         { reason: 'spam' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('notifies host when a message is reported', async () => {
+    prisma.user_profiles.findUnique.mockResolvedValue({ id: 'profile-1' });
+    prisma.activity.findUnique.mockResolvedValue({
+      id: 'activity-1',
+      host_id: 'host-1',
+      title: 'Morning Run',
+    });
+    prisma.activityParticipant.findUnique.mockResolvedValue({
+      status: 'confirmed',
+    });
+    prisma.activityMessage.findUnique.mockResolvedValue({
+      id: 'message-1',
+      activity_id: 'activity-1',
+      author_profile_id: 'profile-2',
+    });
+    prisma.activityMessageReport.create.mockResolvedValue({
+      id: 'report-1',
+    });
+
+    await service.reportMessage(
+      'activity-1',
+      'message-1',
+      { supabaseUserId: 'user-1', type: 'FREE', isVerified: true } as any,
+      { reason: 'abuse', details: 'Bad language' },
+    );
+
+    expect(notificationsService.createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: 'host-1',
+        type: 'safety_alert',
+      }),
+    );
   });
 });

@@ -10,6 +10,7 @@ import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user
 import { CreateActivityFeedbackDto } from './dto/create-activity-feedback.dto';
 import { MembershipSubscriptionsService } from 'src/membership/membership-subscriptions.service';
 import { MembershipTiersService } from 'src/config/membership-tiers.service';
+import { NotificationsService } from 'src/v1/notifications/notifications.service';
 
 export interface FeedbackParticipantSummary {
   profileId: string;
@@ -60,6 +61,7 @@ export class ActivityFeedbackService {
     private readonly prisma: PrismaService,
     private readonly membershipSubscriptionsService: MembershipSubscriptionsService,
     private readonly membershipTiersService: MembershipTiersService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async getFeedbackForm(
@@ -258,6 +260,66 @@ export class ActivityFeedbackService {
 
       return [createdFeedback, createRows] as const;
     });
+
+    await this.notificationsService.createNotification({
+      recipientUserId: activity.host_id,
+      actorUserId: user.supabaseUserId,
+      activityId,
+      type: 'host_update',
+      title: 'New post-activity feedback submitted',
+      body: `A participant submitted post-activity feedback for this activity.`,
+      payload: {
+        feedbackId: feedback.id,
+      },
+    });
+
+    if (ratings.length > 0) {
+      const targetProfiles = await this.prisma.user_profiles.findMany({
+        where: {
+          id: {
+            in: Array.from(new Set(ratings.map((item) => item.target_profile_id))),
+          },
+        },
+        select: {
+          id: true,
+          user_id: true,
+        },
+      });
+      const targetUserByProfile = new Map(
+        targetProfiles.map((profileItem) => [profileItem.id, profileItem.user_id]),
+      );
+
+      const notifications = ratings
+        .map((rating) => ({
+          recipientUserId: targetUserByProfile.get(rating.target_profile_id) ?? null,
+          rating: rating.rating,
+        }))
+        .filter(
+          (
+            row,
+          ): row is {
+            recipientUserId: string;
+            rating: number;
+          } => Boolean(row.recipientUserId),
+        );
+
+      await Promise.all(
+        notifications.map((row) =>
+          this.notificationsService.createNotification({
+            recipientUserId: row.recipientUserId,
+            actorUserId: user.supabaseUserId,
+            activityId,
+            type: 'host_update',
+            title: 'You received a participant rating',
+            body: `Another participant rated you (${row.rating}/5).`,
+            payload: {
+              feedbackId: feedback.id,
+              rating: row.rating,
+            },
+          }),
+        ),
+      );
+    }
 
     return {
       rating: feedback.rating,

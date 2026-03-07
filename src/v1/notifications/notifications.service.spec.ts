@@ -100,6 +100,29 @@ describe('NotificationsService', () => {
     expect(emailService.sendNotificationEmail).not.toHaveBeenCalled();
   });
 
+  it('respects host join/cancel preference for host_update type', async () => {
+    prisma.notificationPreference.upsert.mockResolvedValue({
+      recommended_activities: true,
+      upcoming_activity_reminders: true,
+      host_join_cancel_updates: false,
+      time_location_change_alerts: true,
+      safety_alerts: true,
+      channel_in_app: true,
+      channel_email: true,
+      channel_browser: true,
+    });
+
+    const created = await service.createNotification({
+      recipientUserId: 'user-1',
+      type: 'host_update' as any,
+      title: 'Host update',
+      body: 'An update from your host',
+    });
+
+    expect(created).toBeNull();
+    expect(prisma.notification.create).not.toHaveBeenCalled();
+  });
+
   it('marks all user notifications as read', async () => {
     prisma.notification.updateMany.mockResolvedValue({ count: 4 });
 

@@ -540,6 +540,50 @@ describe('ActivitiesService', () => {
       expect(mockPrismaService.activity.update).toHaveBeenCalled();
     });
 
+    it('notifies participants when non-schedule details change', async () => {
+      const existingActivity = {
+        id: activityId,
+        host_id: hostId,
+        title: 'Original Title',
+        description: 'Original',
+        image_url: null,
+        category: 'Sports',
+        interests: ['basketball'],
+        location: { latitude: 37.7749, longitude: -122.4194 },
+        activity_date: new Date('2099-12-31'),
+        start_time: '10:00',
+        end_time: '12:00',
+        max_participants: 4,
+        current_participants: 2,
+        status: 'published',
+        is_public: true,
+        group_id: null,
+        series_id: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+      const updatedActivity = { ...existingActivity, title: updateDto.title };
+
+      mockPrismaService.interest.findMany.mockResolvedValue([
+        { slug: 'basketball' },
+      ]);
+      mockPrismaService.activity.findUnique.mockResolvedValue(existingActivity);
+      mockPrismaService.activity.update.mockResolvedValue(updatedActivity);
+      mockPrismaService.activityParticipant.findMany.mockResolvedValue([
+        { profile: { user_id: 'participant-1' } },
+      ]);
+
+      await service.update(activityId, hostUser, updateDto);
+
+      expect(notificationsService.createForRecipients).toHaveBeenCalledWith(
+        ['participant-1'],
+        expect.objectContaining({
+          type: 'host_update',
+          title: 'Activity details updated',
+        }),
+      );
+    });
+
     it('should throw ForbiddenException when user is not host', async () => {
       const existingActivity = {
         id: activityId,

@@ -10,6 +10,7 @@ import type { AuthenticatedUser } from 'src/common/interfaces/authenticated-user
 import { CreateActivityMessageDto } from './dto/create-activity-message.dto';
 import { PinActivityMessageDto } from './dto/pin-activity-message.dto';
 import { ReportActivityMessageDto } from './dto/report-activity-message.dto';
+import { NotificationsService } from 'src/v1/notifications/notifications.service';
 
 export interface ActivityMessageSummary {
   id: string;
@@ -27,7 +28,10 @@ export interface ActivityMessageSummary {
 
 @Injectable()
 export class ActivityMessagesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async listMessages(
     activityId: string,
@@ -120,6 +124,13 @@ export class ActivityMessagesService {
       });
     }
 
+    await this.notifyGroupMessage(activity, {
+      activityId,
+      actorUserId: supabaseUserId,
+      authorName: message.author?.full_name ?? 'A participant',
+      messageType,
+    });
+
     return this.mapMessage(message);
   }
 
@@ -187,11 +198,15 @@ export class ActivityMessagesService {
   ) {
     const supabaseUserId = this.requireSupabaseUserId(user);
     const profile = await this.getProfileForUser(supabaseUserId);
-    await this.assertCanAccessActivity(activityId, supabaseUserId, profile.id);
+    const activity = await this.assertCanAccessActivity(
+      activityId,
+      supabaseUserId,
+      profile.id,
+    );
 
     const message = await this.prisma.activityMessage.findUnique({
       where: { id: messageId },
-      select: { id: true, activity_id: true },
+      select: { id: true, activity_id: true, author_profile_id: true },
     });
 
     if (!message || message.activity_id !== activityId) {
@@ -199,7 +214,7 @@ export class ActivityMessagesService {
     }
 
     try {
-      return await this.prisma.activityMessageReport.create({
+      const report = await this.prisma.activityMessageReport.create({
         data: {
           message_id: messageId,
           reporter_profile_id: profile.id,
@@ -207,6 +222,20 @@ export class ActivityMessagesService {
           details: dto.details ?? null,
         },
       });
+      await this.notificationsService.createNotification({
+        recipientUserId: activity.host_id,
+        actorUserId: supabaseUserId,
+        activityId,
+        type: 'safety_alert',
+        title: 'Message reported in activity chat',
+        body: `A participant reported a message in "${activity.title}".`,
+        payload: {
+          messageId: message.id,
+          reason: dto.reason,
+          details: dto.details ?? null,
+        },
+      });
+      return report;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -262,7 +291,7 @@ export class ActivityMessagesService {
   ) {
     const activity = await this.prisma.activity.findUnique({
       where: { id: activityId },
-      select: { id: true, host_id: true },
+      select: { id: true, host_id: true, title: true },
     });
     if (!activity) {
       throw new NotFoundException('Activity not found');
@@ -289,6 +318,56 @@ export class ActivityMessagesService {
     }
 
     return activity;
+  }
+
+  private async notifyGroupMessage(
+    activity: { id: string; host_id: string; title: string },
+    input: {
+      activityId: string;
+      actorUserId: string;
+      authorName: string;
+      messageType: activity_message_type;
+    },
+  ) {
+    const participants = await this.prisma.activityParticipant.findMany({
+      where: {
+        activity_id: input.activityId,
+        status: {
+          in: ['pending', 'confirmed', 'waitlisted'],
+        },
+      },
+      select: {
+        profile: {
+          select: { user_id: true },
+        },
+      },
+    });
+
+    const recipients = new Set<string>([
+      activity.host_id,
+      ...participants.map((participant) => participant.profile.user_id),
+    ]);
+    recipients.delete(input.actorUserId);
+
+    if (recipients.size === 0) {
+      return;
+    }
+
+    const isAnnouncement = input.messageType === 'announcement';
+    await this.notificationsService.createForRecipients(
+      Array.from(recipients),
+      {
+        actorUserId: input.actorUserId,
+        activityId: input.activityId,
+        type: 'host_update',
+        title: isAnnouncement
+          ? 'New activity announcement'
+          : 'New activity group message',
+        body: isAnnouncement
+          ? `${input.authorName} posted an announcement in "${activity.title}".`
+          : `${input.authorName} sent a message in "${activity.title}".`,
+      },
+    );
   }
 
   private requireSupabaseUserId(user: AuthenticatedUser): string {
